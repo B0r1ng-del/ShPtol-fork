@@ -78,7 +78,7 @@
 //     a player seat (the seat is kept and given back on resume).
 
 import { randomBytes, randomInt } from 'node:crypto';
-import { ERR, MAX_SEATS, MAX_SPECTATORS, ROOM_CODE_LEN, modeIdFor } from '../shared/constants.js';
+import { ERR, MAX_SPECTATORS, ROOM_CODE_LEN, roomSeatCap, ULTIMATE_DIFFICULTY, modeIdFor } from '../shared/constants.js';
 import { checkLoadout } from '../shared/protocol.js';
 import { encode, isDroppable, isErrCode, sendRaw, sendSession } from './net.js';
 import { getData as defaultGetData, lookup } from './data.js';
@@ -119,9 +119,9 @@ function freezeLoadout(loadout) {
   return Object.freeze(out);
 }
 
-/** One room: 4 seat slots, host, difficulty, optional running match. */
+/** One room: its mode's seat slots (solo 1, coop MAX_SEATS, ultimate ULTIMATE_SEATS), host, difficulty, optional match. */
 export class Room {
-  /** @param {string} code @param {'solo'|'coop'} mode @param {string} difficulty @param {number} now */
+  /** @param {string} code @param {'solo'|'coop'|'ultimate'} mode @param {string} difficulty @param {number} now */
   constructor(code, mode, difficulty, now) {
     this.code = code;
     this.mode = mode;
@@ -129,7 +129,7 @@ export class Room {
     /** @type {string | null} */
     this.hostId = null;
     /** @type {(Seat | null)[]} */
-    this.seats = new Array(MAX_SEATS).fill(null);
+    this.seats = new Array(roomSeatCap(mode)).fill(null);
     /** @type {{ playerId: string, name: string, connected: boolean }[]} spectator seats, ≤ MAX_SPECTATORS (header) */
     this.spectators = [];
     /** @type {any} running Match instance */
@@ -355,7 +355,9 @@ export class Lobby {
     const code = this.genCode();
     if (!code) return fail(ERR.INTERNAL, 'no room code available');
     if (cur) this.removeMember(cur, session.playerId);
-    const room = new Room(code, mode, difficulty, this.now());
+    // 终极模拟 has no difficulty picker: its room always runs the AC-4 (ABYSS) table, whatever the client sent
+    const diff = mode === 'ultimate' ? ULTIMATE_DIFFICULTY : difficulty;
+    const room = new Room(code, mode, diff, this.now());
     room.ownerKey = key;
     room.seats[0] = this.humanSeat(0, session);
     room.hostId = session.playerId;
@@ -363,7 +365,7 @@ export class Lobby {
     session.roomCode = code;
     session.notice = null;
     session.pendingResult = null;
-    this.log.info(`[lobby] ${code} created (${mode}/${difficulty}) by ${session.name}`);
+    this.log.info(`[lobby] ${code} created (${mode}/${diff}) by ${session.name}`);
     this.broadcastState(room);
     return OK;
   }
@@ -461,6 +463,8 @@ export class Lobby {
     if (!room) return fail(ERR.NOT_IN_ROOM);
     if (room.hostId !== session.playerId) return fail(ERR.NOT_HOST);
     if (room.match) return fail(ERR.ROOM_STARTED);
+    // 终极模拟 has a single difficulty (ABYSS): the lobby shows no picker and the room's value never changes
+    if (room.mode === 'ultimate') return difficulty === ULTIMATE_DIFFICULTY ? OK : fail(ERR.BAD_MSG, '终极模拟 has one difficulty');
     this.dropReplay(room, session.playerId);
     if (room.difficulty !== difficulty) {
       room.difficulty = difficulty;

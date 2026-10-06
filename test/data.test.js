@@ -235,7 +235,8 @@ test('waves: every template resolves spawns, routes and enemies', () => {
 
 test('config: modes, rounds and templates', () => {
   const inScope = Object.values(config.modes).filter((m) => m.inScope);
-  assert.equal(inScope.length, 8);
+  // 8 official modes (training + single/multi × AC-1..AC-4) + the fork's 终极模拟 room (mode_ultimate_abyss)
+  assert.equal(inScope.length, 9);
   for (const m of Object.values(config.modes)) {
     for (const [r, rd] of Object.entries(m.rounds)) {
       const tpls = rd.template ? [rd.template] : Object.values(rd.bossTemplates || {});

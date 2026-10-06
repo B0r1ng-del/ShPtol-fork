@@ -130,7 +130,7 @@
 //     human is left at all the match ends ('abandoned'); when nobody alive is left it ends as 'eliminated'.
 
 import { C2S, unitStatsEntry } from '../../shared/protocol.js';
-import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, GEO, modeIdFor, layerGainRoom } from '../../shared/constants.js';
+import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, GEO, ROOM_MODES, modeIdFor, layerGainRoom } from '../../shared/constants.js';
 import { Battle } from '../sim/Battle.js';
 import { DataSource } from '../sim/simdata.js';
 import { createRng, deriveSeed } from '../sim/rng.js';
@@ -236,9 +236,12 @@ export class Match {
     }
     this.opts = opts;
     this.roomCode = opts.roomCode ?? '----';
-    this.mode = opts.mode === 'solo' ? 'solo' : 'coop';
+    /** The room mode as created ('solo' | 'coop' | 'ultimate'). 终极模拟 plays with the co-op rules below (`this.mode`);
+     * `roomMode` keeps the third value for the mode-specific content (its config record, per-mode bans / shop / scaling). */
+    this.roomMode = ROOM_MODES.includes(opts.mode) ? opts.mode : 'coop';
+    this.mode = this.roomMode === 'solo' ? 'solo' : 'coop';
     this.difficulty = opts.difficulty;
-    this.modeId = opts.modeId || modeIdFor(this.mode, opts.difficulty);
+    this.modeId = opts.modeId || modeIdFor(this.roomMode, opts.difficulty);
     this.seed = (Number(opts.seed) >>> 0) || 1;
     this.log = opts.log || noopLog;
     this.sendFn = opts.send;

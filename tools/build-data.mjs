@@ -36,6 +36,9 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Grid, DEPLOY_REFUSED_TILES } from '../server/sim/grid.js';
 import { bandBondIds } from '../shared/bandBonds.js';
+// The fork's own mode/field layer over the built config (终极模拟 …): kept out of the official-data derivation so a
+// regeneration from the game's tables cannot drop it, and so every fork-only value sits in one reviewable file.
+import { applyForkOverrides } from './fork-overrides.mjs';
 
 // ===== CLI & IO ==================================================================================
 
@@ -3249,7 +3252,7 @@ async function main() {
   // the bonds each strategy is built around (DESIGN §21.26): the bot skips, and the strategy draft marks 本局禁用, a band
   // whose bond the mode switches off
   for (const b of Object.values(bands)) b.bondIds = bandBondIds(b, { bonds, pools: choices.pools });
-  const config = buildConfig(ctx, waves, stages, bands);
+  const config = applyForkOverrides(buildConfig(ctx, waves, stages, bands));
   const files = { config, chess, bonds, garrisons, items, bands, effects, choices, enemies, factions, waves, stages, bosses, tokens };
 
   const errors = validateAll(files);
