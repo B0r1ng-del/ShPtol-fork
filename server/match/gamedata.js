@@ -421,9 +421,17 @@ export class GameData {
       difficulties: Array.isArray(h.difficulties) ? h.difficulties : DEFAULTS.hiddenCore.difficulties,
     };
   }
+  /**
+   * Per-match ban counts of a difficulty: how many core / add-on bonds the seeded draw removes from play
+   * (server/match/pool.js drawDisabledBonds). `config.bans` is difficulty-keyed, but a MODE may carry a table of its
+   * own (`modes[modeId].bans`, the fork's 终极模拟 = `{ core: 0, addon: 0 }` — "此模式下所有盟约不会被禁用"), which
+   * wins when present so a fork mode can switch the draw off without disturbing its difficulty's official numbers.
+   * A mode table that leaves a field out means 0, never the difficulty's default.
+   */
   bans(difficulty) {
-    const b = this.config.bans && this.config.bans[difficulty];
-    const d = DEFAULTS.bans[difficulty] || { core: 0, addon: 0 };
+    const own = this.mode && typeof this.mode.bans === 'object' && this.mode.bans !== null && !Array.isArray(this.mode.bans) ? this.mode.bans : null;
+    const b = own || (this.config.bans && this.config.bans[difficulty]);
+    const d = own ? { core: 0, addon: 0 } : (DEFAULTS.bans[difficulty] || { core: 0, addon: 0 });
     if (!b || typeof b !== 'object') return { ...d };
     return { core: Number.isInteger(b.core) && b.core >= 0 ? b.core : d.core, addon: Number.isInteger(b.addon) && b.addon >= 0 ? b.addon : d.addon };
   }

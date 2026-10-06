@@ -12,7 +12,8 @@
 //   * tools/build-data.mjs calls it on the freshly built config before writing (so a full regeneration keeps it), and
 //     `node tools/fork-data.mjs` applies it to the committed `data/config.json` in place (the small, reviewable diff).
 //
-// Every fork feature that lives in generated data lands here, one block per feature, each with the reason it exists.
+// Every fork feature that lives in generated data lands here, one block per feature, each with the reason it exists:
+//   * `bans: { core: 0, addon: 0 }` on the 终极模拟 mode — no per-match bond ban there (requirement 二.1)
 
 /** modeId of the fork's third room mode (终极模拟, AC-4, up to six 博士). */
 export const FORK_MODE_ID = 'mode_ultimate_abyss';
@@ -58,6 +59,14 @@ export function forkUltimateMode(modes) {
     difficulty: 'ABYSS',
     inScope: true,
     desc: '敌方攻击强度到达极限的模拟训练',
+    // The mode's own bond table (requirement 二.1 "此模式下所有盟约不会被禁用"): 0 core + 0 add-on banned.
+    // `config.bans` is difficulty-keyed (ABYSS = 3 + 4), so the per-match draw that removes 干员 from the shop has
+    // to be switched off by the mode itself — GameData.bans() prefers this record over the difficulty's (see the
+    // comment there). `activeBondIds` already lists all 23 bonds and `inactiveBondIds` is empty, so with no draw
+    // every 盟约 stays in play.
+    bans: { core: 0, addon: 0 },
+    // …and it says so on the difficulty card, like the official 终极模拟 ("盟约与干员全部解锁").
+    effectDescList: ['·盟约与干员全部解锁', '·作战环境无比困难', '·出现极度危险的敌人'],
   };
 }
 

@@ -65,14 +65,20 @@ Where it is wired in:
   `difficultyInfo`, `effDifficulty`).
 - `public/js/screens/room.js` — `normalizeSeats()` pads to `roomSeatCap(room.mode)`; the difficulty picker is
   replaced by a fixed tag.
-- `tools/fork-overrides.mjs` — the `mode_ultimate_abyss` record (a copy of the AC-4 co-op mode).
+- `tools/fork-overrides.mjs` — the `mode_ultimate_abyss` record (a copy of the AC-4 co-op mode plus the fork's own
+  fields).
 
 What the fork mode deliberately starts as: **an exact copy of AC-4 co-op**, so the room is playable the moment it
-exists. The fork's per-mode rules land on top of it one change at a time (bond bans, the shop-slot table, the enemy
-stat adjustments, the 机变 vote), each one extending `tools/fork-overrides.mjs` and `test/fork-data.test.js`.
+exists. The fork's per-mode rules land on top of it one change at a time, each one extending
+`tools/fork-overrides.mjs` and its own test file:
+- **二.1 盟约不会被禁用** — the mode carries `bans: { core: 0, addon: 0 }` and `GameData.bans()` prefers a mode's own
+  table over the difficulty's one (`config.bans`, ABYSS = 3 core + 4 add-on). Without it the seeded per-match draw of
+  `server/match/pool.js` removes up to 7 盟约 and takes every 干员 whose whole bond list they cover out of the shop
+  for the run. `test/fork-ultimate-bans.test.js`.
 
 ## Fork change log
 
 | Change | What it does | Where |
 |---|---|---|
 | 终极模拟 room | the third room mode, six seats, fixed AC-4, `mode_ultimate_abyss` | as listed above |
+| 二.1 盟约不禁用 | the mode draws 0 bond bans (`bans: { core: 0, addon: 0 }`) and its card says 盟约与干员全部解锁 | `tools/fork-overrides.mjs`, `server/match/gamedata.js` (`bans()`), `test/fork-ultimate-bans.test.js` |
