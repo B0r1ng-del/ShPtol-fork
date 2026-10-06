@@ -1,6 +1,6 @@
-// Room screen (同盟等待室): 4 seat cards (avatar frame, name, ready state, AI badge, host crown),
-// host controls (difficulty picker, add/remove AI in co-op, start), invite code with copy code /
-// copy link, ready toggle and leave.
+// Room screen (同盟等待室): the mode's seat cards (4 in co-op, 6 in 终极模拟; avatar frame, name, ready state, AI badge,
+// host crown), host controls (difficulty picker — 终极模拟 has none, add/remove AI in co-op, start), invite code with copy
+// code / copy link, ready toggle and leave.
 //
 // Start rule (server/lobby.js): room.start needs every *other* human connected and ready; the
 // host's start counts as the host's ready. So 开始模拟 is enabled exactly then and sends room.start
@@ -11,7 +11,7 @@
 // button for 观战中 and offers 入座 (room.join of the room) while a player seat is free.
 
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
-import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SEATS, MAX_SPECTATORS } from '../../../shared/constants.js';
+import { DIFFICULTIES, DIFFICULTY_NAMES, DIFFICULTY_COLORS, MAX_SPECTATORS, roomSeatCap } from '../../../shared/constants.js';
 import {
   html, Button, Icon, MicroLabel, PingPill, AvatarFrame, DifficultyTag, DifficultyIcon, Tooltip, confirmDialog, doctorNo,
 } from '../ui/components.js';
@@ -24,12 +24,12 @@ import { store, useStore, shallowEqual, emptyMatch, isSpectating } from '../stor
 import { difficultyInfo } from './lobby.js';
 
 /**
- * Seats padded to the room's capacity (co-op 4, solo 1), each null or a seat record.
+ * Seats padded to the room's capacity (ultimate 6, co-op 4, solo 1), each null or a seat record.
  * @param {any} room room.state payload
  * @returns {(null | {seat:number, playerId:any, name:string, isBot:boolean, ready:boolean, connected:boolean})[]}
  */
 export function normalizeSeats(room) {
-  const cap = room?.mode === 'solo' ? 1 : MAX_SEATS;
+  const cap = roomSeatCap(room?.mode);
   const src = Array.isArray(room?.seats) ? room.seats : [];
   const out = [];
   for (let i = 0; i < cap; i++) {
@@ -170,6 +170,13 @@ function InviteBox({ code, name, difficulty }) {
 }
 
 function DifficultyPicker({ room, isHost, busy, onPick }) {
+  // 终极模拟 has a single difficulty (AC-4): no radiogroup, just the mode's own tag
+  if (room.mode === 'ultimate') {
+    return html`<div class="dpick dpick--ro">
+      <${DifficultyTag} difficulty=${room.difficulty} size="lg" code=${difficultyInfo(room.mode, room.difficulty).code} />
+      <span class="t-dim">终极模拟固定难度</span>
+    </div>`;
+  }
   if (!isHost) {
     return html`<div class="dpick dpick--ro">
       <${DifficultyTag} difficulty=${room.difficulty} size="lg" code=${difficultyInfo(room.mode, room.difficulty).code} />

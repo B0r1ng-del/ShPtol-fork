@@ -7,6 +7,20 @@ export const APP_VERSION = '0.1.4';
 
 export const MAX_SEATS = 4;
 /**
+ * Seat cap of the 终极模拟 room — the fork's third room mode. The official 终极模拟 ("与至多6名博士组成同盟，共享干员池，
+ * 联防协作抵御敌潮") hosts up to SIX 博士, where 独立模拟 is 1 and 同盟模拟 is MAX_SEATS (4). MAX_SEATS keeps its meaning
+ * for every pre-existing room: solo = 1 seat, coop = 4, ultimate = ULTIMATE_SEATS.
+ */
+export const ULTIMATE_SEATS = 6;
+/** Room modes a `room.create` may ask for, in lobby-card order. */
+export const ROOM_MODES = Object.freeze(['solo', 'coop', 'ultimate']);
+/** Seat cap per room mode (solo 1 / coop MAX_SEATS / ultimate ULTIMATE_SEATS); unknown modes fall back to MAX_SEATS. */
+export const SEATS_BY_MODE = Object.freeze({ solo: 1, coop: MAX_SEATS, ultimate: ULTIMATE_SEATS });
+/** Seat cap of a room mode: the lobby's seat grid, the protocol's seat ranges and the room screen all read it. */
+export const roomSeatCap = (roomMode) => SEATS_BY_MODE[roomMode] ?? MAX_SEATS;
+/** 终极模拟 offers no difficulty picker: its single difficulty is the ABYSS table (AC-4), kept on the mode record. */
+export const ULTIMATE_DIFFICULTY = 'ABYSS';
+/**
  * Spectator seats of a co-op room (community report #26, owner's decision 2026-10-04) — a remake feature: the official
  * room has 1–4 players and no spectator seat (there only eliminated players and 联防 bystanders watch, research 09 §3.1).
  * A spectator never counts as a player, may not act, and watches like an eliminated player (server/lobby.js spectate,
@@ -20,9 +34,10 @@ export const DIFFICULTIES = ['FUNNY', 'NORMAL', 'HARD', 'ABYSS'];
 export const DIFFICULTY_NAMES = { FUNNY: '标准模拟', NORMAL: '险境模拟', HARD: '绝境模拟', ABYSS: '终极模拟' };
 export const DIFFICULTY_COLORS = { FUNNY: '#f6a329', NORMAL: '#e85a1a', HARD: '#e73118', ABYSS: '#ff0024' };
 
-// modeId in data/config.json = `mode_${type}_${difficulty.toLowerCase()}` with type single|multi
+// modeId in data/config.json = `mode_${type}_${difficulty.toLowerCase()}` with type single|multi|ultimate
+const MODE_TYPE = Object.freeze({ solo: 'single', coop: 'multi', ultimate: 'ultimate' });
 export const modeIdFor = (roomMode, difficulty) =>
-  `mode_${roomMode === 'solo' ? 'single' : 'multi'}_${difficulty.toLowerCase()}`;
+  `mode_${MODE_TYPE[roomMode] || 'multi'}_${difficulty.toLowerCase()}`;
 
 export const PHASE = Object.freeze({
   LOBBY: 'LOBBY',
