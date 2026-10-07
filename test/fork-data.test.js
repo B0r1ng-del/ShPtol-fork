@@ -77,4 +77,19 @@ describe('fork data layer (tools/fork-overrides.mjs ⇄ data/config.json)', () =
       }
     }
   });
+
+  test('二.1: the fork mode carries its own bond-ban table and advertises the unlocked roster', () => {
+    const m = config.modes[FORK_MODE_ID];
+    assert.deepEqual(m.bans, { core: 0, addon: 0 }, 'no per-match bond draw in 终极模拟');
+    assert.equal(config.modes[FORK_BASE_MODE_ID].bans, undefined, 'the official AC-4 record stays difficulty-keyed');
+    assert.deepEqual(config.bans.ABYSS, { core: 3, addon: 4 }, 'and the ABYSS difficulty table is untouched');
+    assert.equal(m.inactiveBondIds.length, 0);
+    assert.equal(m.activeBondIds.length, 23, 'every 盟约 stays active');
+    assert.ok(m.effectDescList.some((l) => l.includes('盟约与干员全部解锁')), 'the card says so');
+    assert.deepEqual(
+      config.modes[FORK_BASE_MODE_ID].effectDescList,
+      ['·作战环境无比困难', '·出现极度危险的敌人'],
+      'the official AC-4 card does not change',
+    );
+  });
 });
