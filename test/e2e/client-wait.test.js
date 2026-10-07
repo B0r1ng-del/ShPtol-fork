@@ -16,8 +16,12 @@ function fakePage(trueAfter) {
   const calls = [];
   return {
     calls,
+    /** The origin of the fake predicate's timeline (test 1 derives its slice count from it). */
+    t0,
     waitForFunction(fn, opts, ...args) {
-      calls.push({ fn, opts, args });
+      // `at` = when the slice STARTED: a real setTimeout overshoots its delay by a few ms under load, so the number of
+      // slices a predicate needs is a property of the timeline, never of a single hard-coded call count
+      calls.push({ fn, opts, args, at: Date.now() });
       const left = t0 + trueAfter - Date.now();
       return new Promise((resolve, reject) => {
         if (left <= opts.timeout) setTimeout(() => resolve({ handle: 'ok', args }), Math.max(0, left));
@@ -28,17 +32,39 @@ function fakePage(trueAfter) {
 }
 
 test('a wait longer than one slice keeps polling the same predicate until it holds', async () => {
-  const page = fakePage(95);
+  // The predicate turns true 95 ms in, i.e. after ⌈95 / 30⌉ = 4 slices of 30 ms — but a real setTimeout overshoots its
+  // delay by a few ms under load, so the number of slices a machine actually needs is 3 or 4. Asserting a hard-coded
+  // count made this test fail on ~2 of 3 runs ("sliced (3 calls)"); the SLICING is what is under test, so the count is
+  // derived from the timeline each slice really took instead.
+  const TRUE_AFTER = 95;
+  const SLICE = 30;
+  const TOL = 5; // clock granularity: Date.now() and the timer callback are not the same instant
+  const page = fakePage(TRUE_AFTER);
   const fn = () => true;
-  const got = await waitForFunctionLong(page, fn, { timeout: 1000, polling: 200, slice: 30 }, 'a', 2);
+  const got = await waitForFunctionLong(page, fn, { timeout: 1000, polling: 200, slice: SLICE }, 'a', 2);
   assert.deepEqual(got, { handle: 'ok', args: ['a', 2] });
-  assert.ok(page.calls.length >= 4, `sliced (${page.calls.length} calls)`);
+  // it sliced at all: the whole wait was never handed to one waitForFunction
+  assert.ok(page.calls.length > 1, `sliced (${page.calls.length} calls)`);
   for (const c of page.calls) {
     assert.equal(c.fn, fn);
     assert.deepEqual(c.args, ['a', 2]);
     assert.equal(c.opts.polling, 200);
-    assert.ok(c.opts.timeout > 0 && c.opts.timeout <= 30, `slice ${c.opts.timeout}`);
+    assert.ok(c.opts.timeout > 0 && c.opts.timeout <= SLICE, `slice ${c.opts.timeout}`);
   }
+  // …and the count is the one the timeline demands: every slice but the last expired while the predicate was still
+  // false (its `left` exceeded its own timeout), and the last one was already able to resolve. A slice that ended
+  // early — the old flake — would show up here as a call that had no reason to be made.
+  const startedAt = (i) => page.calls[i].at - page.t0;
+  for (let i = 0; i < page.calls.length - 1; i++) {
+    assert.ok(startedAt(i) + page.calls[i].opts.timeout < TRUE_AFTER + TOL,
+      `call ${i} started ${startedAt(i)}ms in and had to keep polling (its slice ran out before ${TRUE_AFTER}ms)`);
+  }
+  const last = page.calls.length - 1;
+  assert.ok(startedAt(last) + page.calls[last].opts.timeout >= TRUE_AFTER - TOL,
+    `the last call (started ${startedAt(last)}ms in) could resolve`);
+  // the timeline's own lower bound, allowing exactly one overshoot: ⌈95/30⌉ slices are needed, a late timer may save one
+  assert.ok(page.calls.length >= Math.ceil(TRUE_AFTER / SLICE) - 1,
+    `at least ${Math.ceil(TRUE_AFTER / SLICE) - 1} slices (${page.calls.length} calls)`);
 });
 
 test('the overall timeout still ends the wait with a TimeoutError naming it; the last slice is the remainder', async () => {
