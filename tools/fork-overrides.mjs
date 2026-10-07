@@ -67,6 +67,19 @@ export function forkUltimateMode(modes) {
     bans: { core: 0, addon: 0 },
     // …and it says so on the difficulty card, like the official 终极模拟 ("盟约与干员全部解锁").
     effectDescList: ['·盟约与干员全部解锁', '·作战环境无比困难', '·出现极度危险的敌人'],
+    // 局内商店升级规则 (requirement 二.2): every operator level adds one 干员购买槽位 (3→4→5→6→7); the LAST one adds a
+    // second 道具购买槽位 instead. The official AC-4 table is {3,4,4,5,5,5} with ONE item slot throughout, so the top
+    // operator level is 7 slots — two more than AC-4's 5 — and level 6 carries two item slots.
+    // GameData.shopSlots(level) reads this table (clamping to chess ≤ 8, item ≤ 4) and PlayerState.rollShop lays the
+    // slots out from it (`shop.layout = { chess, item }`), so nothing but these numbers changes.
+    shopSlots: {
+      1: { chess: 3, item: 1 },
+      2: { chess: 4, item: 1 },
+      3: { chess: 5, item: 1 },
+      4: { chess: 6, item: 1 },
+      5: { chess: 7, item: 1 },
+      6: { chess: 7, item: 2 },
+    },
   };
 }
 
