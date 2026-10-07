@@ -15,7 +15,9 @@
 .lobby-left, .lobby-right { display: flex; flex-direction: column; min-width: 0; }
 
 /* ---- mode cards ------------------------------------------------------------------------------------ */
-.mode-cards { display: grid; grid-template-columns: 1fr 1fr; gap: .24rem; margin-bottom: .34rem; }
+/* the three 模拟方式 cards sit in ONE row of three equal columns (独立模拟 / 同盟模拟 / 终极模拟): the old 2-column
+   grid wrapped the third card onto a second row at a different width, which read as a layout accident */
+.mode-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .24rem; margin-bottom: .34rem; }
 .mode-card {
   --bk-c: transparent;
   --bk-l: .2rem;
