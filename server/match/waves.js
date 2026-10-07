@@ -281,6 +281,8 @@ function previewInfo(gd, key, route, boss = false, leader = undefined) {
  */
 function templateSpawns(gd, tpl, round, pick) {
   const scale = scaleFor(gd, round);
+  // the MODE's own spawn extras on top of the official table (fork 二.3; all 1 for every official mode)
+  const ex = gd.enemyExtras(round);
   const ph = placeholderMap(gd);
   const routes = Array.isArray(tpl.routes) ? tpl.routes : [];
   const leader = isLeaderTemplate(tpl);
@@ -327,8 +329,18 @@ function templateSpawns(gd, tpl, round, pick) {
       interval: count > 1 ? step : 0,
       // the round multipliers are ENEMY effects on every enemy but 炎佑 (aceffect_enemy_1–5 `enemy_attribute_mul`,
       // enemy_exclude = enemy_9012_acloon): leader parts take them all; the leader takes ATK / speed but not HP — its HP
-      // is the server pool, "领袖单位于服务器的生命值加成不受上述加成影响" (PRTS 下半)
-      mods: isBoss ? { atkMul: scale.atkMul, speedMul: scale.speedMul, slot } : { hpMul: scale.hpMul, atkMul: scale.atkMul, speedMul: scale.speedMul, slot },
+      // is the server pool, "领袖单位于服务器的生命值加成不受上述加成影响" (PRTS 下半). The mode's own extras sit on top
+      // (ex.*): the ordinary +HP never reaches the leader (it has no hpMul here) nor a 部位 (`isPart`), while the
+      // leader's / hidden core's ATK and DEF do — `defMul` is only added when it is not 1, so an official spec is
+      // byte-identical to before.
+      mods: isBoss
+        ? {
+          atkMul: scale.atkMul * ex.bossAtk, speedMul: scale.speedMul, slot,
+          ...(ex.bossDef !== 1 ? { defMul: ex.bossDef } : null),
+        }
+        : {
+          hpMul: scale.hpMul * (isPart ? 1 : ex.normalHp), atkMul: scale.atkMul, speedMul: scale.speedMul, slot,
+        },
       actionIndex: i,
       preview: previewInfo(gd, key, routes[routeIndex], isBoss, leader),
     };
@@ -477,6 +489,8 @@ function runsOf(list) {
 
 function bountyPlan(gd, round, wave, bounties, playerId, side) {
   const scale = scaleFor(gd, round);
+  // a bounty unit is an ordinary enemy: it takes the mode's +HP extra like the round's own spawns (never a boss)
+  const ex = gd.enemyExtras(round);
   const routes = (wave && wave.routes) || [];
   const acts = Array.isArray(wave && wave.actions) ? wave.actions : [];
   const leader = isLeaderTemplate(wave && wave.templateId ? gd.wave(wave.templateId) : null);
@@ -528,7 +542,7 @@ function bountyPlan(gd, round, wave, bounties, playerId, side) {
         routeIndex,
         count: run.len,
         interval: run.len > 1 ? step : 0,
-        mods: { hpMul: scale.hpMul, atkMul: scale.atkMul, speedMul: scale.speedMul, slot: classOf(gd, c.enemyKey), bountyId: b.id },
+        mods: { hpMul: scale.hpMul * ex.normalHp, atkMul: scale.atkMul, speedMul: scale.speedMul, slot: classOf(gd, c.enemyKey), bountyId: b.id },
         tag: 'bounty',
         ownerPlayerId: playerId,
         preview: previewInfo(gd, c.enemyKey, routes[routeIndex], false, leader),

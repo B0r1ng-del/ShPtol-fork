@@ -108,4 +108,22 @@ describe('fork data layer (tools/fork-overrides.mjs ⇄ data/config.json)', () =
     assert.deepEqual(m.upgradePrices, [5, 8, 11, 12, 13], 'the upgrade prices are the AC-4 ones');
     assert.equal(m.maxShopLevel, 6);
   });
+
+  test('二.3: the fork mode carries the enemy adjustment block, and only the fork mode', () => {
+    const m = config.modes[FORK_MODE_ID];
+    assert.deepEqual(m.enemyAdjust, {
+      fromRound: 4,
+      normal: { hp: 1.1 },
+      leader: { hp: 1.2, def: 1.2, atk: 1.08 },
+      hidden: { hp: 1.35, def: 1.35, atk: 1.16 },
+    });
+    assert.equal(config.modes[FORK_BASE_MODE_ID].enemyAdjust, undefined, 'the official AC-4 record has none');
+    for (const [id, mode] of Object.entries(config.modes)) {
+      if (id === FORK_MODE_ID) continue;
+      assert.equal(mode.enemyAdjust, undefined, `${id} must not carry a fork adjustment`);
+    }
+    // the official per-round table itself is untouched by 二.3 (the extras sit beside it, they do not rewrite it)
+    assert.deepEqual(m.enemyScale, config.modes[FORK_BASE_MODE_ID].enemyScale);
+    assert.ok(m.effectDescList.some((l) => l.includes('第 4 回合起敌人强度提升')), 'the card says so');
+  });
 });
