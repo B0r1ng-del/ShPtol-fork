@@ -70,9 +70,9 @@
 .ewheel__panel::after {
   content: ''; position: absolute; left: .15rem; top: 2.11rem; width: 2.82rem; height: .49rem;
   background: rgba(19, 19, 19, .92);
-  /* square bottom corners and NO outer shadow: the band must run straight into the 交流 button under it — a rounded,
-     shadowed bottom edge drew a ring between the two and read as a cut */
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07);
+  /* hairlines on the two SIDES and the bottom only. A full 1px ring (inset 0 0 0 1px) also drew a bright line across the
+     panel exactly where the emote grid ends and this band starts — that is the "cut" the panel showed. */
+  box-shadow: inset 1px 0 0 rgba(255, 255, 255, .07), inset -1px 0 0 rgba(255, 255, 255, .07), inset 0 -1px 0 rgba(255, 255, 255, .07);
   border-radius: 0;
 }
 .ewheel__viewport { position: absolute; left: .205rem; top: .19rem; width: 2.71rem; height: 1.78rem; overflow: hidden; touch-action: pan-y; cursor: grab; }
