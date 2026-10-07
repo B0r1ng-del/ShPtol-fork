@@ -48,7 +48,7 @@
 /* emoji_bkg is 313×231 with a soft shadow margin; its opaque plate spans x 15–297, y 13–212. The cells, the pager
    and the CSS fallback plate all use that geometry. */
 .ewheel__panel {
-  position: absolute; left: -.15rem; bottom: calc(100% + .02rem); z-index: 5;
+  position: absolute; left: -.15rem; bottom: 100%; z-index: 5;
   /* the plate art is 2.31rem tall; the panel is 2.66rem so that the .49rem extension band (::after below) is INSIDE it
      — that band is where 一键十连 / 弹幕 live, so the two switches belong to the panel instead of floating under it */
   width: 3.13rem; height: 2.66rem; padding: 0; box-sizing: border-box;
@@ -70,8 +70,10 @@
 .ewheel__panel::after {
   content: ''; position: absolute; left: .15rem; top: 2.11rem; width: 2.82rem; height: .49rem;
   background: rgba(19, 19, 19, .92);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07), 0 .04rem .16rem rgba(0, 0, 0, .5);
-  border-radius: 0 0 .06rem .06rem;
+  /* square bottom corners and NO outer shadow: the band must run straight into the 交流 button under it — a rounded,
+     shadowed bottom edge drew a ring between the two and read as a cut */
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07);
+  border-radius: 0;
 }
 .ewheel__viewport { position: absolute; left: .205rem; top: .19rem; width: 2.71rem; height: 1.78rem; overflow: hidden; touch-action: pan-y; cursor: grab; }
 .ewheel__viewport:active { cursor: grabbing; }
@@ -101,9 +103,10 @@
 /* pager: ‹ dots › in the strip under the cells. Every dot is the SAME square and only its colour marks the current
    page — the active one used to be `transform: scale(1.12)`, which rendered it as a visibly taller white block that
    stuck out of the 10px strip and read as a different kind of element. */
-.ewheel__dots { position: absolute; left: .15rem; width: 2.82rem; top: 1.99rem; height: .12rem; display: flex; align-items: center; justify-content: center; gap: .12rem; }
+/* the whole pager is scaled to 80% of what it was (dots .11 → .088rem, gap .12 → .096rem, strip .12 → .1rem) */
+.ewheel__dots { position: absolute; left: .15rem; width: 2.82rem; top: 2rem; height: .1rem; display: flex; align-items: center; justify-content: center; gap: .096rem; }
 .ewheel__dot {
-  position: relative; width: .11rem; height: .11rem; padding: 0; border: 0; border-radius: .02rem; background: rgba(255, 255, 255, .28);
+  position: relative; width: .088rem; height: .088rem; padding: 0; border: 0; border-radius: .016rem; background: rgba(255, 255, 255, .28);
   transition: background-color var(--t-fast), box-shadow var(--t-fast);
 }
 .ewheel__dot:hover { background: rgba(255, 255, 255, .55); }
@@ -175,24 +178,29 @@
 .ewheel__opt:hover { color: var(--text-hi); border-color: var(--line-3); }
 .ewheel__opt.is-on { color: var(--text-on-mint); background: var(--mint-500); border-color: var(--mint-400); font-weight: 700; }
 
-/* ---- fork 二.5: the 弹幕 layer ------------------------------------------------------------------- */
+/* ---- fork 二.5: the 弹幕 layer — the emotes FALL like snow ---------------------------------------- */
 .ebarrage { position: absolute; inset: 0; z-index: 40; overflow: hidden; pointer-events: none; }
 .ebarrage__item {
-  position: absolute; top: calc(10% + var(--eb-lane, 0) * 8%);
-  left: 100%; width: .56rem; height: .56rem; display: grid; place-items: center;
+  position: absolute; top: -.6rem; left: var(--eb-x, 50%);
+  width: .5rem; height: .5rem; display: grid; place-items: center;
   filter: drop-shadow(0 .03rem .08rem rgba(0, 0, 0, .8));
-  animation: emo-barrage var(--eb-ms, 9s) linear forwards;
+  animation: emo-fall var(--eb-ms, 9s) linear forwards;
 }
 .ebarrage__item.is-mine { filter: drop-shadow(0 0 .1rem rgba(23, 249, 183, .75)); }
 .ebarrage__item img { width: 100%; height: 100%; object-fit: contain; }
-/* fully off the left edge AND transparent at the end, so nothing can linger there if a frame is dropped */
-@keyframes emo-barrage {
-  from { transform: translateX(0); opacity: 1; }
-  to { transform: translateX(calc(-100% - 100vw)); opacity: 0; }
+/* a snowflake: drops the height of the screen, swaying sideways and turning a little on the way down, then is gone —
+   fully below the bottom edge AND transparent, so nothing can linger there if a frame is dropped. `--eb-x`, `--eb-sway`,
+   `--eb-rot` and `--eb-ms` are drawn per item (see ui/emotes.js EmoteBarrage), which is what makes the spawn positions
+   random instead of a fixed lane pattern. */
+@keyframes emo-fall {
+  0% { transform: translate(0, 0) rotate(var(--eb-rot, 0deg)); opacity: 0; }
+  10% { opacity: 1; }
+  50% { transform: translate(var(--eb-sway, .3rem), 55vh) rotate(calc(var(--eb-rot, 0deg) + 25deg)); opacity: 1; }
+  100% { transform: translate(0, 118vh) rotate(calc(var(--eb-rot, 0deg) + 55deg)); opacity: 0; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   /* the barrage is pure motion: with motion reduced, show the recent ones statically instead of disabling the feature */
   .ebarrage { display: flex; gap: .06rem; align-items: flex-start; justify-content: flex-end; padding: .1rem; }
-  .ebarrage__item { position: static; left: auto; animation: none; opacity: .85; }
+  .ebarrage__item { position: static; left: auto; top: auto; animation: none; opacity: .85; }
 }

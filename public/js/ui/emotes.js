@@ -211,17 +211,39 @@ export function EmoteBubble({ id, class: cls, ttl = EMOTE_BUBBLE_MS, at }) {
 }
 
 /**
- * 弹幕 layer (fork, requirement 二.5 "让表情变成横向滚动的弹幕", every mode): the recent `m.emote` events fly across the
- * screen right→left instead of (or as well as) the avatar bubbles. Pure display — it changes nothing that is sent, and
- * one lane per item keeps a 一键十连 from stacking ten icons on top of each other.
- * @param {{ emotes?: any[], myId?: string|null, lanes?: number }} props `emotes` = store.emotes ({ seq, playerId, id })
+ * 弹幕 layer (fork, requirement 二.5, every mode): the recent `m.emote` events FALL like snow instead of (or as well as)
+ * the avatar bubbles, each one at a random spot and with its own sway and tilt — so a 一键十连 never stacks ten icons
+ * on top of each other. Pure display: it changes nothing that is sent.
+ * @param {{ emotes?: any[], myId?: string|null, lanes?: number }} props `emotes` = store.emotes ({ seq, playerId, id }).
+ *   `lanes` is accepted but no longer used (the falling layout draws each item's position at random).
  */
-export function EmoteBarrage({ emotes = [], myId = null, lanes = 6 }) {
+const SPAWN = new Map();
+/**
+ * The random "snowflake" parameters of one item, drawn once and then remembered: a re-render must never make an icon
+ * that is already falling jump sideways. `ms` stays at or below the item's lifetime (EMOTE_BARRAGE_MS) so the drop and
+ * the expiry in the render loop agree.
+ */
+function spawnOf(seq) {
+  let s = SPAWN.get(seq);
+  if (!s) {
+    s = {
+      x: 3 + Math.random() * 90,                                   // start position across the width
+      sway: (Math.random() * 2 - 1) * .55,                         // rem it drifts sideways on the way down
+      rot: (Math.random() * 2 - 1) * 45,                           // degrees it is turned by
+      ms: Math.round(EMOTE_BARRAGE_MS * (.9 + Math.random() * .1)),
+    };
+    SPAWN.set(seq, s);
+    if (SPAWN.size > 96) SPAWN.delete(SPAWN.keys().next().value);
+  }
+  return s;
+}
+
+export function EmoteBarrage({ emotes = [], myId = null }) {
   useData('local');
   const [, tick] = useState(0);
   const now = Date.now();
   // an item lives exactly as long as its flight: the ones whose animation has run out are DROPPED here, because an
-  // animation with `forwards` used to park the element against the left edge and leave it on screen for good
+  // animation with `forwards` used to park the element at the end of its path and leave it on screen for good
   const rows = (Array.isArray(emotes) ? emotes : [])
     .filter((e) => now - (Number.isFinite(e.at) ? e.at : now) < EMOTE_BARRAGE_MS)
     .slice(-24);
@@ -234,12 +256,11 @@ export function EmoteBarrage({ emotes = [], myId = null, lanes = 6 }) {
   }, [oldest && oldest.seq, rows.length]);
   if (!rows.length) return null;
   return html`<div class="ebarrage" aria-hidden="true">
-    ${rows.map((e, i) => {
+    ${rows.map((e) => {
       const mine = !!myId && e.playerId === myId;
-      // one LANE per item keeps a 一键十连 from stacking icons, and a small per-item delay fans them out in time as well
-      // (two items only share a lane 6 apart, i.e. ~420 ms, by which time the first is far to the left)
+      const s = spawnOf(e.seq);
       return html`<span key=${e.seq} class=${cx('ebarrage__item', mine && 'is-mine')}
-        style=${`--eb-lane:${i % Math.max(1, lanes)}; --eb-ms:${EMOTE_BARRAGE_MS}ms; animation-delay:${Math.min(i, 8) * 70}ms`}>
+        style=${`--eb-x:${s.x.toFixed(2)}%; --eb-sway:${s.sway.toFixed(3)}rem; --eb-rot:${s.rot.toFixed(1)}deg; --eb-ms:${s.ms}ms`}>
         <${EmoteArt} id=${e.id} />
       </span>`;
     })}
