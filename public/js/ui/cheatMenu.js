@@ -1,13 +1,14 @@
 // public/js/ui/cheatMenu.js — 作弊菜单 (fork, requirement 三: available in EVERY mode).
 //
-//   * 触发与激活 — the 悬浮球 opens a panel; while locked the panel shows only the activation code input. Typing
-//     CHEAT_CODE unlocks it and the unlock is remembered per device (loadPref/savePref). The code is a UI GATE, not a
-//     security boundary: it ships in this bundle, and the server only validates the ACTION (shared/protocol.js).
-//   * UI与交互 — the ball is DRAGGABLE and its position is remembered; the panel is DRAGGABLE by its title bar
-//     ("拖拽标题栏移动"), also remembered. Both are clamped to the viewport on every render so a position saved on a
-//     big screen cannot leave the ball off-screen on a small one.
-//   * 菜单功能 — five controls sending `g.cheat`: 无限资金 (a switch), 复原资金, 商店满级, 免费刷新 +5, 盟约层数 +100.
-//     They are server commands that touch the activating player's own state only (owner's call "谁开谁负责").
+//   * 触发与激活 — ONE floating control (图四): while locked it is a small ball; typing CHEAT_CODE in the panel it is
+//     attached to unlocks it. The activation code is a UI GATE, not a security boundary (it ships in this bundle) and
+//     the server validates the ACTION only (shared/protocol.js).
+//   * 悬浮球与面板是一体的 — the control MORPHS in place: closed it is the 悬浮球, clicking it turns it into the menu,
+//     and the menu's ✕ turns it back into the ball at the same spot. The whole thing is DRAGGABLE in both states (the
+//     ball itself, the panel's title bar) and the position is remembered (`PREF_POS`), clamped to the viewport on every
+//     read so a position saved on a large screen cannot leave it off-screen on a small one.
+//   * 菜单功能 — five rows sending `g.cheat`: 无限资金 (a switch, with the funds beside it), 复原资金, 商店满级,
+//     免费刷新 +5, 盟约层数 +100. Server commands that touch the activating player's own state only ("谁开谁负责").
 //   * 红色警告横幅 — CheatBanner renders the `m.cheat` broadcast the room receives the FIRST time a player uses a
 //     cheat: `"<name>"纸尿裤兜不住了!!`.
 //
@@ -22,22 +23,33 @@ const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
 export const CHEAT_CSS_HREF = '/css/cheat.css';
 export const PREF_UNLOCKED = 'cheatUnlocked';
-export const PREF_BALL = 'cheatBall';
-export const PREF_PANEL = 'cheatPanel';
+/** The one remembered position of the whole control (viewport fractions), shared by the ball and the panel. */
+export const PREF_POS = 'cheatPos';
+/** Kept for callers written against the older two-position version (the ball had a pref of its own). */
+export const PREF_BALL = PREF_POS;
+export const PREF_PANEL = PREF_POS;
 /** The banner stays up this long (the requirement only says it is raised once). */
 export const CHEAT_BANNER_MS = 7000;
+/** Where the control first appears (left of the HUD's own top-right corner, so the panel fits). */
+export const CHEAT_HOME = Object.freeze({ x: 0.78, y: 0.1 });
+/**
+ * The panel's width as a fraction of the viewport — a fixed 3.02rem of the 19.2rem design width, so this is constant at
+ * every size. The OPEN panel grows to the right of the shared anchor, so it is clamped by this: without it a position
+ * saved for the small 悬浮球 (or a wide default) would push the menu off the right edge of the screen.
+ */
+export const CHEAT_PANEL_W = 0.17;
 
 /** Whether this device has already typed the activation code. */
 export const cheatUnlocked = () => loadPref(PREF_UNLOCKED, false) === true;
-/** The activation code check, exported for tests: an exact match unlocks. */
+/** The activation code check, exported for tests: an exact match (surrounding blanks tolerated) unlocks. */
 export const cheatCodeOk = (code) => String(code ?? '').trim() === CHEAT_CODE;
-/** The five panel entries, in the panel's order (labels are the requirement's own wording). */
+/** The five panel rows, in the panel's order (the labels are the requirement's own wording). */
 export const CHEAT_BUTTONS = Object.freeze([
-  { action: 'infiniteFunds', label: '无限资金', kind: 'switch', title: `资金不再被扣除（面板数字补到 ${CHEAT_INFINITE_FUNDS}）` },
-  { action: 'restoreFunds', label: '复原资金', kind: 'button', title: '恢复到开启无限资金之前的资金' },
-  { action: 'maxShop', label: '商店满级', kind: 'button', title: '调度中心直接升到最高级并重排货架' },
-  { action: 'freeRefresh', label: '免费刷新 +5', kind: 'button', title: '增加 5 次免费刷新' },
-  { action: 'bondLayers', label: '盟约层数 +100', kind: 'button', title: '当前已激活的每个盟约 +100 层' },
+  { action: 'infiniteFunds', label: '无限资金', kind: 'switch', glyph: '¥', title: `资金不再被扣除（面板数字补到 ${CHEAT_INFINITE_FUNDS} 以上）` },
+  { action: 'restoreFunds', label: '复原资金', kind: 'button', glyph: '↻', title: '恢复到开启无限资金之前的资金' },
+  { action: 'maxShop', label: '商店满级', kind: 'button', glyph: '⛨', title: '调度中心直接升到最高级并重排货架' },
+  { action: 'freeRefresh', label: '免费刷新 +5', kind: 'button', glyph: '↻', title: '增加 5 次免费刷新' },
+  { action: 'bondLayers', label: '盟约层数 +100', kind: 'button', glyph: '◆', title: '当前已激活的每个盟约 +100 层' },
 ]);
 
 /** Link public/css/cheat.css once (dev harnesses); no-op outside a browser. */
@@ -83,19 +95,20 @@ export function CheatBanner({ cheats = [] }) {
 }
 
 /**
- * The 悬浮球 + panel. `onCheat(action, on)` sends the intent (`ui/gameActions.js` actions.cheat).
+ * The one-piece 悬浮球 / 面板. `onCheat(action, on)` sends the intent (`ui/gameActions.js` actions.cheat).
  * @param {{ onCheat: (action: string, on?: boolean|null) => void, priv?: any, disabled?: boolean }} props
- *   `priv` = m.private (its `cheat.infiniteFunds` is the server's authoritative switch state)
+ *   `priv` = m.private (its `cheat.infiniteFunds` is the server's authoritative switch state; `priv.funds` is shown on
+ *   the 无限资金 row, like the reference panel)
  */
 export function CheatMenu({ onCheat, priv = null, disabled = false }) {
   useEffect(() => { ensureCheatCss(); }, []);
   const [unlocked, setUnlocked] = useState(cheatUnlocked);
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState('');
-  const [ball, setBall] = useState(() => clampPos(loadPref(PREF_BALL, null), { x: 0.93, y: 0.12 }));
-  const [panel, setPanel] = useState(() => clampPos(loadPref(PREF_PANEL, null), { x: 0.66, y: 0.2 }));
+  const [pos, setPos] = useState(() => clampPos(loadPref(PREF_POS, null), CHEAT_HOME));
   const drag = useRef(null);
   const infinite = !!priv?.cheat?.infiniteFunds;
+  const funds = Number.isFinite(priv?.funds) ? Math.trunc(priv.funds) : null;
 
   const submitCode = () => {
     if (!cheatCodeOk(code)) return;
@@ -104,11 +117,11 @@ export function CheatMenu({ onCheat, priv = null, disabled = false }) {
     setCode('');
   };
 
-  // one pointer-drag helper for both the ball and the panel's title bar: the target is moved by viewport fractions
-  const startDrag = (what) => (e) => {
+  // ONE drag handler for the whole control: the ball is its own handle, the panel is dragged by its title bar
+  const startDrag = (e) => {
     if (e.button != null && e.button !== 0) return;
     const box = e.currentTarget.getBoundingClientRect();
-    drag.current = { what, id: e.pointerId, dx: e.clientX - box.left, dy: e.clientY - box.top, moved: false };
+    drag.current = { id: e.pointerId, dx: e.clientX - box.left, dy: e.clientY - box.top, moved: false };
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
   };
   const onMove = (e) => {
@@ -117,44 +130,45 @@ export function CheatMenu({ onCheat, priv = null, disabled = false }) {
     d.moved = true;
     const w = Math.max(1, globalThis.innerWidth || 1);
     const h = Math.max(1, globalThis.innerHeight || 1);
-    const next = clampPos({ x: (e.clientX - d.dx) / w, y: (e.clientY - d.dy) / h }, { x: 0.5, y: 0.5 });
-    if (d.what === 'ball') setBall(next); else setPanel(next);
+    setPos(clampPos({ x: (e.clientX - d.dx) / w, y: (e.clientY - d.dy) / h }, CHEAT_HOME));
   };
   const endDrag = (e) => {
     const d = drag.current;
     if (!d || d.id !== e.pointerId) return;
     drag.current = null;
-    if (!d.moved) return;
-    savePref(d.what === 'ball' ? PREF_BALL : PREF_PANEL, d.what === 'ball' ? ball : panel);
+    if (!d.moved) return;               // a click, not a drag: the ball's onClick still opens the panel
+    savePref(PREF_POS, pos);
     e.preventDefault();
   };
+  const dragProps = {
+    onPointerDown: startDrag, onPointerMove: onMove, onPointerUp: endDrag, onPointerCancel: endDrag,
+  };
+  // the open panel must stay on screen: it extends to the right of the ball's own anchor
+  const shownX = Math.min(pos.x, open ? 0.98 - CHEAT_PANEL_W : 0.98);
 
-  return html`<div class="cheat">
-    <button type="button" class=${cx('cheat-ball', !unlocked && 'is-locked', open && 'is-on')}
-      style=${`left:${(ball.x * 100).toFixed(3)}%; top:${(ball.y * 100).toFixed(3)}%`}
-      title=${unlocked ? '作弊菜单（可拖动）' : '作弊菜单：点开输入激活码'}
-      aria-label="作弊菜单" aria-expanded=${open ? 'true' : 'false'} data-testid="cheat-ball"
-      onPointerDown=${startDrag('ball')} onPointerMove=${onMove} onPointerUp=${endDrag} onPointerCancel=${endDrag}
-      onClick=${() => { if (!drag.current) setOpen((v) => !v); }}>${unlocked ? '☠' : '⌘'}</button>
-    ${open ? html`<section class="cheat-panel" role="dialog" aria-label="作弊菜单"
-      style=${`left:${(panel.x * 100).toFixed(3)}%; top:${(panel.y * 100).toFixed(3)}%`} data-testid="cheat-panel">
-      <header class="cheat-panel__bar" onPointerDown=${startDrag('panel')} onPointerMove=${onMove}
-        onPointerUp=${endDrag} onPointerCancel=${endDrag}>
-        <span class="cheat-panel__crown">♛</span>
+  return html`<div class="cheat" style=${`left:${(shownX * 100).toFixed(3)}%; top:${(pos.y * 100).toFixed(3)}%`} data-testid="cheat-root">
+    ${open ? html`<section class="cheat-panel" role="dialog" aria-label="作弊菜单" data-testid="cheat-panel">
+      <header class="cheat-panel__bar" ...${dragProps}>
+        <span class="cheat-panel__crown" aria-hidden="true">♛</span>
         <b class="cheat-panel__title">作弊菜单</b>
         <span class="cheat-panel__micro">CHEAT</span>
-        <button type="button" class="cheat-panel__x" aria-label="关闭" onClick=${() => setOpen(false)}>✕</button>
+        <button type="button" class="cheat-panel__ico" aria-label="说明"
+          title="作弊指令只影响你自己；本局第一次使用会向全房间播报一条红色警告">i</button>
+        <button type="button" class="cheat-panel__ico cheat-panel__x" aria-label="关闭" title="收起为悬浮球"
+          data-testid="cheat-close" onClick=${() => setOpen(false)}>✕</button>
       </header>
       ${unlocked ? html`<div class="cheat-panel__body">
         ${CHEAT_BUTTONS.map((b) => (b.kind === 'switch'
           ? html`<button key=${b.action} type="button" class=${cx('cheat-row', 'cheat-row--switch', infinite && 'is-on')}
               title=${b.title} data-testid=${`cheat-${b.action}`} disabled=${disabled}
               aria-pressed=${infinite ? 'true' : 'false'} onClick=${() => onCheat(b.action, !infinite)}>
-              <span class="cheat-row__label">${b.label}</span>
               <span class="cheat-switch" aria-hidden="true"><i></i></span>
+              <span class="cheat-row__label">${b.label}</span>
+              ${funds != null ? html`<span class="cheat-row__value num">${funds}</span>` : null}
             </button>`
           : html`<button key=${b.action} type="button" class="cheat-row" title=${b.title}
               data-testid=${`cheat-${b.action}`} disabled=${disabled} onClick=${() => onCheat(b.action, null)}>
+              <span class="cheat-row__glyph" aria-hidden="true">${b.glyph}</span>
               <span class="cheat-row__label">${b.label}</span>
             </button>`))}
       </div>` : html`<div class="cheat-panel__body cheat-panel__body--locked">
@@ -164,7 +178,10 @@ export function CheatMenu({ onCheat, priv = null, disabled = false }) {
         <button type="button" class="cheat-row cheat-row--go" onClick=${submitCode} disabled=${!cheatCodeOk(code)}>激活</button>
       </div>`}
       <footer class="cheat-panel__foot">拖拽标题栏移动</footer>
-    </section>` : null}
+    </section>` : html`<button type="button" class=${cx('cheat-ball', !unlocked && 'is-locked')}
+      title=${unlocked ? '作弊菜单（可拖动）' : '作弊菜单：点开输入激活码'}
+      aria-label="作弊菜单" aria-expanded="false" data-testid="cheat-ball" ...${dragProps}
+      onClick=${() => { if (!drag.current) setOpen(true); }}><span aria-hidden="true">${unlocked ? '♛' : '⚙'}</span></button>`}
   </div>`;
 }
 
