@@ -91,8 +91,20 @@ export function pickBusy(busyIdx, card, mine) {
  */
 export function cardPickable(sp, card, { myId, solo, busyIdx = null }) {
   if (!sp || !card) return false;
-  const myTurn = solo || sp.turnPid === myId;
+  // a parallel draft (fork 二.4) has no turn: every player still to act may pick at any time
+  const myTurn = solo || sp.parallel || sp.turnPid === myId;
   return myTurn && sp.pickOf.get(myId) == null && !card.takenBy && busyIdx == null;
+}
+
+/**
+ * Whether the 随机分配 vote may be cast right now (fork 二.4): the server offers it for THIS draft (`randomOffer`, null
+ * in a 悬赏决策 draft and in every official mode) and this player has not acted yet.
+ * @param {any} sp normalizeSp(...) @param {{ myId: string, solo: boolean }} o
+ */
+export function randomVoteAvailable(sp, { myId, solo }) {
+  if (!sp || !sp.parallel || !Array.isArray(sp.randomOffer) || !sp.randomOffer.includes(sp.family)) return false;
+  if (!(solo || sp.turnPid === myId || !sp.pickOf.has(myId))) return false;
+  return sp.pickOf.get(myId) == null && !(sp.randomVotes || []).includes(myId);
 }
 
 /**
@@ -144,21 +156,26 @@ export function ChoiceOverlay(props) {
     if (r.pick != null) onPick(r.pick);
   };
   return html`<${ChoiceView} ...${props} armed=${armed} onTap=${tap}
-    onConfirm=${() => { if (armed != null) tap(armed); }} onDisarm=${() => setSel(null)} />`;
+    onConfirm=${() => { if (armed != null) tap(armed); }} onDisarm=${() => setSel(null)}
+    onRandom=${props.onRandom || null} />`;
 }
 
 /**
  * The overlay's view (pure: no hooks — test/ui renders it as a function).
  * @param {{ pub:any, sp:any, myId:string, solo:boolean, busyIdx?:number|null, total?:number|null, armed?:number|null,
- *   onTap?:(idx:number)=>void, onConfirm?:()=>void, onDisarm?:()=>void }} props
+ *   onTap?:(idx:number)=>void, onConfirm?:()=>void, onDisarm?:()=>void, onRandom?:(()=>void)|null }} props
  */
-export function ChoiceView({ pub, sp, myId, solo, busyIdx = null, total = null, armed = null, onTap = () => {}, onConfirm = () => {}, onDisarm = () => {} }) {
+export function ChoiceView({ pub, sp, myId, solo, busyIdx = null, total = null, armed = null, onTap = () => {}, onConfirm = () => {}, onDisarm = () => {}, onRandom = null }) {
   if (!sp) return null;
   const fam = data.get('choices')?.families?.[sp.family] || null;
   const players = new Map(sortedPlayers(pub).map((p) => [p.playerId, p]));
-  const myTurn = solo || sp.turnPid === myId;
+  const myTurn = solo || sp.parallel || sp.turnPid === myId;
   const mine = sp.pickOf.get(myId);
   const turnName = players.get(sp.turnPid)?.name || '队友';
+  const canVote = !!onRandom && randomVoteAvailable(sp, { myId, solo });
+  const votes = (sp.randomVotes || []).length;
+  const aliveCount = (Array.isArray(pub?.players) ? pub.players : []).filter((p) => p && p.alive !== false).length;
+  const votesNeeded = Math.max(1, Math.ceil(aliveCount / 2));
   const special = /_s$/.test(String(sp.family || ''));
   const order = solo ? [] : sp.order;
   const timed = !solo && !sp.untimed;
@@ -178,12 +195,17 @@ export function ChoiceView({ pub, sp, myId, solo, busyIdx = null, total = null, 
         <div class="spov__titles">
           <${MicroLabel} tone="mint">CONTINGENCY // 机变阶段</${MicroLabel}>
           <h2 class=${cx('spov__title', special && 'is-special')}>${sp.name || fam?.name || '机变'}<span class="spov__bar">|</span><span class="spov__desc"><${RichText} text=${sp.desc || fam?.desc || '选择一项'} /></span></h2>
-          <p class="spov__sub">${timed ? '倒计时结束后仍未选定将自动分配' : '选择一项（无时间限制）'}${mine == null && myTurn ? ' · 点击卡牌选中，再次点击确认' : ''}</p>
+          <p class="spov__sub">${timed ? '倒计时结束后仍未选定将自动分配' : '选择一项（无时间限制）'}${sp.parallel && sp.randomOffer ? ' · 也可投票给「随机分配」：过半即由系统随机发放' : ''}${mine == null && myTurn ? ' · 点击卡牌选中，再次点击确认' : ''}</p>
         </div>
         <div class="spov__turn">
           ${mine != null ? html`<span class="spov__turntxt is-done"><${Icon} name="check" />已完成选择</span>`
+            : (sp.randomVotes || []).includes(myId) ? html`<span class="spov__turntxt is-done"><${Icon} name="check" />已投票：随机分配</span>`
+            : sp.parallel ? html`<span class="spov__turntxt">等待其他博士决策…<${Icon} name="hourglass" /></span>`
             : myTurn ? html`<span class="spov__turntxt is-mine">当前轮到你决策</span>`
             : html`<span class="spov__turntxt">${turnName} 正在决策…<${Icon} name="hourglass" /></span>`}
+          ${sp.parallel && sp.randomOffer ? html`<span class="spov__votes num" title="达到半数票后由系统随机分配（覆盖个人选择）">随机票 <b class="num">${votes}</b>/${votesNeeded}</span>` : null}
+          ${canVote ? html`<${Button} variant="secondary" size="lg" icon="dots" class="spov__random" data-testid="sp-random"
+              title="投票给「随机分配」：达到半数票后由系统把卡牌随机发放给每名博士（覆盖个人选择）" onClick=${onRandom}>随机分配<//>` : null}
           ${armed != null ? html`<${Button} variant="primary" size="lg" icon="check" class="spov__confirm" data-testid="sp-confirm"
               title=${armedName ? `确认选择「${armedName}」（再次点击卡牌亦可）` : '确认选择'} onClick=${onConfirm}>确认选择<//>` : null}
           ${timed ? html`<${Countdown} deadline=${pub?.deadline} total=${total ?? undefined} size="sm" />` : null}

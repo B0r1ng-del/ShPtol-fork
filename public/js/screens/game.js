@@ -640,8 +640,9 @@ function MatchScreen() {
     if ((busyPrep || myPick) && cd.remain > 0) audio.sfx('timer', { volume: 0.6 });
   });
 
-  // your turn cue in the 机变 draft
-  const spMine = !!sp && !solo && sp.turnPid === myId && !sp.pickOf.has(myId);
+  // your turn cue in the 机变 draft (a parallel draft, fork 二.4, cues whoever still has to act)
+  const spMine = !!sp && !solo && (sp.parallel || sp.turnPid === myId) && !sp.pickOf.has(myId)
+    && !(sp.randomVotes || []).includes(myId);
   useEffect(() => { if (spMine) audio.sfx('yourTurn'); }, [spMine]);
 
   // promotion (merge reward offered) and bond activation cues; a special refresh's offer (凯瑟琳 定向投放 …) plays the
@@ -1367,7 +1368,8 @@ function MatchScreen() {
     </div>
 
     ${sp ? html`<${ChoiceOverlay} pub=${pub} sp=${sp} myId=${myId} solo=${solo} busyIdx=${spBusy} total=${total}
-      onPick=${async (i) => { setSpBusy(i); await actions.choice(i); setSpBusy(null); }} />` : null}
+      onPick=${async (i) => { setSpBusy(i); await actions.choice(i); setSpBusy(null); }}
+      onRandom=${async () => { setSpBusy(-1); await actions.choiceRandom(); setSpBusy(null); }} />` : null}
 
     ${banner ? html`<${PhaseBanner} key=${banner.key} mode="overlay" title=${banner.title} sub=${banner.sub} micro=${banner.micro}
       tone=${banner.tone} duration=${banner.duration || 1500} onDone=${() => setBanner(null)} />` : null}

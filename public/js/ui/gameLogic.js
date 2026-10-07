@@ -1468,6 +1468,12 @@ export function normalizeSp(sp, players = []) {
     name: typeof sp.name === 'string' && sp.name ? sp.name : null,
     desc: typeof sp.desc === 'string' && sp.desc ? sp.desc : null,
     untimed: !!sp.untimed,
+    // fork 二.4 (终极模拟): a parallel, untimed draft where any player may vote for the random allocation instead of
+    // picking. `randomOffer` is the server's per-draft gate — non-null only when the vote is offered right now (the
+    // mode lists the family and it is not 悬赏), so the button renders on the frame alone.
+    parallel: !!sp.parallel,
+    randomOffer: Array.isArray(sp.randomOffer) ? sp.randomOffer.filter((f) => typeof f === 'string') : null,
+    randomVotes: Array.isArray(sp.randomVotes) ? sp.randomVotes.filter((p) => typeof p === 'string') : [],
     cards, order, turnPid, pickOf, takenBy, pickedCount: pickOf.size,
   };
 }

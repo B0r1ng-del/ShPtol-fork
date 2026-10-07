@@ -323,7 +323,8 @@ export function attachAudit(m, { invariants = true, limit = 200 } = {}) {
       if (m.phase !== PHASE.SP_DRAFT || !m.sp) return;
       const s = m.sp;
       if (s.idx >= s.order.length) return;
-      if (m.soloUntimed) { if (m.deadline) fail('untimed 机变 is timed'); } else expectDeadline(s.idx === 0 ? gd.timer('spFirst') : gd.timer('spTurn'), `SP_DRAFT turn ${s.idx}`);
+      // untimed: solo / single-human (m.soloUntimed) and any mode asking for it (fork 二.4 — `sp.untimed`)
+      if (m.soloUntimed || s.untimed) { if (m.deadline) fail('untimed 机变 is timed'); } else expectDeadline(s.idx === 0 ? gd.timer('spFirst') : gd.timer('spTurn'), `SP_DRAFT turn ${s.idx}`);
     });
     return res;
   });
@@ -334,10 +335,15 @@ export function attachAudit(m, { invariants = true, limit = 200 } = {}) {
       const want = m.isSolo ? 3 : 6;
       if (s.cards.length > want) fail(`${s.cards.length} 机变 cards (max ${want})`);
       if (s.order.length !== alive.length) fail(`机变 order ${s.order.length} for ${alive.length} alive`);
+      // fork 二.4: a parallel draft lets a player end after only voting for the random draw when the vote lost —
+      // "未过半则各自拿走自己选择的道具", and a voter who picked nothing takes nothing this round
+      const votedOnly = (pid) => !!(s.parallel && s.randomVotes && s.randomVotes.has(pid));
       for (const pid of alive) {
         const idx = s.picks[pid];
-        if (idx == null) fail(`${pid} ends 机变 without a card`);
-        else if (s.taken[idx] !== pid) fail(`${pid} picked card ${idx} held by ${s.taken[idx]}`);
+        if (idx == null) {
+          if (votedOnly(pid)) continue;
+          fail(`${pid} ends 机变 without a card`);
+        } else if (s.taken[idx] !== pid) fail(`${pid} picked card ${idx} held by ${s.taken[idx]}`);
       }
       const holders = Object.values(s.taken);
       if (new Set(holders).size !== holders.length) fail('a player took two 机变 cards');
