@@ -49,9 +49,9 @@
   padding: .3rem .6rem .24rem;
 }
 .seats--solo { grid-template-columns: 3.8rem minmax(0, 6.4rem); }
-/* 终极模拟 (six seats): three columns × two rows, so all six 席位 are on screen at the same size — the 同盟模拟 grid
-   keeps four slots on one row and leaves a half-empty second row for seats 5–6 */
-.seats--ultimate { grid-template-columns: repeat(3, minmax(0, 4.1rem)); grid-template-rows: repeat(2, minmax(0, 1fr)); }
+/* 终极模拟 (six seats): ONE row of six equal 席位 (the official room's layout) — all six positions on screen at the
+   same size, instead of 同盟模拟's four slots plus a half-empty second row for seats 5–6 */
+.seats--ultimate { grid-template-columns: repeat(6, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); }
 
 .seat {
   --bk-c: var(--line-3);
