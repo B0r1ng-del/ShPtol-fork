@@ -1,60 +1,86 @@
 /* ==========================================================================================
-   css/cheat.css — 作弊菜单 (fork, requirement 三): the 悬浮球, the draggable panel and the red 警告横幅.
-   Every geometry is a rem of the 19.2 × 10.8 design viewport (theme.css html { font-size: clamp(…100vw/19.2…) }),
-   like the rest of the HUD. Loaded by ui/cheatMenu.js when the page does not link it.
+   css/cheat.css — 作弊菜单 (fork, requirement 三): the 悬浮球 / 面板 一体 control and the red 警告横幅.
+   The control MORPHS in place: closed it is the ball, open it is the panel, and both are anchored with their TOP-LEFT
+   at the remembered position (PREF_POS) — so switching states never moves it and the drag math is exact in both.
+   Geometry is in rem of the 19.2 × 10.8 design viewport (theme.css html { font-size: clamp(…100vw/19.2…) }).
+   Loaded by ui/cheatMenu.js when the page does not link it.
    ========================================================================================== */
 
-.cheat { position: absolute; inset: 0; z-index: 60; pointer-events: none; }
+/* the anchor: a zero-size box at the remembered position; only its children take the pointer */
+.cheat { position: absolute; z-index: 60; pointer-events: none; }
 .cheat > * { pointer-events: auto; }
 
-/* ---- 悬浮球 (draggable; its position is a viewport fraction from the prefs) ---- */
+/* ---- 悬浮球 (closed state; the whole control is draggable, so the ball itself is the handle) ---- */
 .cheat-ball {
-  position: absolute; width: .52rem; height: .52rem; margin: -.26rem 0 0 -.26rem;
-  display: grid; place-items: center; font-size: .24rem; line-height: 1;
-  color: var(--mint-400); background: rgba(8, 11, 10, .82);
+  width: .46rem; height: .46rem; display: grid; place-items: center; padding: 0;
+  font-size: .22rem; line-height: 1;
+  color: var(--mint-400); background: rgba(8, 11, 10, .86);
   border: 2px solid var(--mint-700); border-radius: 50%; cursor: grab;
   box-shadow: 0 .04rem .16rem rgba(0, 0, 0, .55);
-  touch-action: none; opacity: .55; transition: opacity var(--t-fast), transform var(--t-fast), border-color var(--t-fast);
+  touch-action: none; opacity: .5;
+  transition: opacity var(--t-fast), transform var(--t-fast), border-color var(--t-fast);
 }
-.cheat-ball:hover, .cheat-ball.is-on { opacity: 1; border-color: var(--mint-400); }
-.cheat-ball:active { cursor: grabbing; transform: scale(.96); }
+.cheat-ball:hover { opacity: 1; border-color: var(--mint-400); }
+.cheat-ball:active { cursor: grabbing; transform: scale(.94); }
 .cheat-ball.is-locked { color: var(--text-dim); border-color: var(--line-3); }
 
-/* ---- panel (draggable by its title bar) ---- */
+/* ---- 面板 (open state) ---- */
 .cheat-panel {
-  position: absolute; width: 3.5rem; transform: translate(-0%, -0%);
-  background: linear-gradient(180deg, rgba(14, 19, 17, .97), rgba(8, 11, 10, .98));
+  width: 3.02rem; transform-origin: top left;
+  background: linear-gradient(180deg, rgba(16, 21, 19, .98), rgba(8, 11, 10, .99));
   border: 1px solid var(--line-2); border-top: 2px solid var(--gold);
-  box-shadow: 0 .1rem .4rem rgba(0, 0, 0, .6);
+  box-shadow: 0 .1rem .4rem rgba(0, 0, 0, .65);
+  animation: cheat-in var(--t-fast) var(--ease-out);
 }
+@keyframes cheat-in { from { opacity: 0; transform: scale(.94); } }
+
 .cheat-panel__bar {
-  display: flex; align-items: center; gap: .06rem; padding: .06rem .08rem;
-  background: rgba(0, 0, 0, .5); border-bottom: 1px solid var(--line-2); cursor: grab; touch-action: none;
+  display: flex; align-items: center; gap: .05rem; padding: .05rem .06rem .05rem .08rem;
+  background: rgba(0, 0, 0, .55); border-bottom: 1px solid var(--line-2);
+  cursor: grab; touch-action: none; user-select: none;
 }
 .cheat-panel__bar:active { cursor: grabbing; }
-.cheat-panel__crown { color: var(--gold); font-size: .18rem; }
-.cheat-panel__title { font-size: .17rem; letter-spacing: .08em; color: var(--text-hi); }
-.cheat-panel__micro { flex: 1; font-size: .11rem; letter-spacing: .28em; color: var(--mint-400); }
-.cheat-panel__x { width: .22rem; height: .22rem; line-height: 1; color: var(--text-md); background: none; border: 0; cursor: pointer; }
-.cheat-panel__x:hover { color: var(--red-premium); }
-.cheat-panel__body { display: flex; flex-direction: column; gap: .05rem; padding: .08rem; }
-.cheat-panel__body--locked { gap: .06rem; }
-.cheat-panel__foot { padding: .02rem .08rem .06rem; font-size: .11rem; color: var(--text-dim); text-align: right; }
-
-.cheat-row {
-  display: flex; align-items: center; justify-content: space-between; gap: .08rem;
-  height: .34rem; padding: 0 .1rem; font-size: .15rem; letter-spacing: .04em; cursor: pointer;
-  color: var(--text-md); background: rgba(8, 11, 10, .8); border: 1px solid var(--line-2); text-align: left;
+.cheat-panel__crown { color: var(--gold); font-size: .17rem; line-height: 1; }
+.cheat-panel__title { font-size: .16rem; letter-spacing: .06em; color: var(--text-hi); }
+.cheat-panel__micro { flex: 1; margin-left: .04rem; font-size: .11rem; letter-spacing: .26em; color: var(--mint-400); }
+.cheat-panel__ico {
+  width: .2rem; height: .2rem; display: grid; place-items: center; padding: 0;
+  font-size: .12rem; line-height: 1; color: var(--text-dim);
+  background: none; border: 1px solid transparent; border-radius: 50%; cursor: pointer;
 }
-.cheat-row:hover:not(:disabled) { color: var(--text-hi); border-color: var(--mint-400); }
+.cheat-panel__ico:hover { color: var(--text-hi); border-color: var(--line-3); }
+.cheat-panel__x:hover { color: var(--red-premium); }
+
+.cheat-panel__body { display: flex; flex-direction: column; gap: .06rem; padding: .08rem; }
+.cheat-panel__body--locked { gap: .06rem; }
+.cheat-panel__foot { padding: .02rem .08rem .07rem; font-size: .11rem; color: var(--text-dim); text-align: right; }
+
+/* ---- rows ---- */
+.cheat-row {
+  display: flex; align-items: center; gap: .08rem;
+  min-height: .34rem; padding: 0 .1rem;
+  font-size: .15rem; letter-spacing: .04em; text-align: left; cursor: pointer;
+  color: var(--text-md); background: rgba(255, 255, 255, .03); border: 1px solid var(--line-2);
+}
+.cheat-row:hover:not(:disabled) { color: var(--text-hi); border-color: var(--mint-700); background: rgba(78, 216, 175, .06); }
 .cheat-row:disabled { opacity: .5; cursor: not-allowed; }
 .cheat-row__label { flex: 1; }
+.cheat-row__glyph { width: .18rem; text-align: center; color: var(--text-lo); font-size: .14rem; }
+.cheat-row__value { font-size: .17rem; font-weight: 700; color: var(--mint-400); }
+.cheat-row--switch.is-on { color: var(--text-hi); border-color: var(--mint-500); background: rgba(78, 216, 175, .14); }
 .cheat-row--go { justify-content: center; color: var(--text-on-mint); background: var(--mint-500); border-color: var(--mint-400); font-weight: 700; }
-.cheat-row--switch.is-on { color: var(--text-on-mint); background: var(--mint-500); border-color: var(--mint-400); font-weight: 700; }
 
-.cheat-switch { position: relative; width: .44rem; height: .2rem; background: rgba(0, 0, 0, .6); border: 1px solid var(--line-3); border-radius: .1rem; flex: none; }
-.cheat-switch i { position: absolute; top: 1px; left: 1px; width: .16rem; height: .16rem; border-radius: 50%; background: var(--text-dim); transition: left var(--t-fast), background var(--t-fast); }
-.cheat-row--switch.is-on .cheat-switch i { left: calc(100% - .17rem); background: #0b1822; }
+/* the switch sits on the LEFT of its row (图四), the funds value on the right */
+.cheat-switch {
+  position: relative; flex: none; width: .4rem; height: .18rem;
+  background: rgba(0, 0, 0, .65); border: 1px solid var(--line-3); border-radius: .09rem;
+}
+.cheat-switch i {
+  position: absolute; top: 1px; left: 1px; width: .14rem; height: .14rem; border-radius: 50%;
+  background: var(--text-dim); transition: left var(--t-fast), background var(--t-fast);
+}
+.cheat-row--switch.is-on .cheat-switch { background: var(--mint-500); border-color: var(--mint-400); }
+.cheat-row--switch.is-on .cheat-switch i { left: calc(100% - .15rem); background: #0b1822; }
 
 .cheat-code {
   height: .32rem; padding: 0 .1rem; font-size: .15rem; color: var(--text-hi);
@@ -76,6 +102,6 @@
 @keyframes cheat-banner-in { from { opacity: 0; transform: translate(-50%, -.3rem); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .cheat-banner { animation: none; }
+  .cheat-banner, .cheat-panel { animation: none; }
   .cheat-ball, .cheat-switch i { transition: none; }
 }
