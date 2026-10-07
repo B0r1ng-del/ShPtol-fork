@@ -451,8 +451,9 @@ export class Lobby {
     if (room.match) return fail(ERR.ROOM_STARTED);
     this.dropReplay(room, session.playerId);
     const seat = room.seatOf(session.playerId);
-    if (seat.ready !== ready) {
-      seat.ready = ready;
+    const on = ready === true;   // normalise: a truthy non-boolean must not become the published ready flag
+    if (seat.ready !== on) {
+      seat.ready = on;
       this.broadcastState(room);
     }
     return OK;
