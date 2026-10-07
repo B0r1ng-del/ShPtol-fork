@@ -1133,6 +1133,30 @@ describe('screen helpers', () => {
     assert.deepEqual(cheat.clampPos({ x: -5, y: 42 }, { x: 0.9, y: 0.1 }), { x: 0.02, y: 0.98 });
     assert.deepEqual(cheat.clampPos({ x: 'x', y: NaN }, { x: 0.9, y: 0.1 }), { x: 0.9, y: 0.1 });
     assert.deepEqual(cheat.clampPos({ x: 0.5, y: 0.5 }, { x: 0, y: 0 }), { x: 0.5, y: 0.5 });
+    // 三: the unlock belongs to the SERVER SESSION — one code entry is enough while `me.playerId` stays the same, and a
+    // restarted server (which re-issues it) asks again. A legacy `true` from the older per-device flag is not an unlock.
+    {
+      const bag = new Map();
+      const savedLs = globalThis.localStorage;
+      globalThis.localStorage = {
+        getItem: (k) => (bag.has(k) ? bag.get(k) : null),
+        setItem: (k, v) => { bag.set(k, String(v)); },
+        removeItem: (k) => { bag.delete(k); },
+      };
+      try {
+        const { savePref } = await mod('store.js');
+        assert.equal(cheat.cheatUnlocked('p_1'), false, 'nothing remembered yet');
+        cheat.rememberCheatUnlock('p_1');
+        assert.equal(cheat.cheatUnlocked('p_1'), true, 'same server session stays unlocked (✕ then reopen)');
+        assert.equal(cheat.cheatUnlocked('p_2'), false, 'a new server session asks again');
+        assert.equal(cheat.cheatUnlocked(), true, 'with no session to track, the record alone decides');
+        savePref(cheat.PREF_UNLOCKED, true);
+        assert.equal(cheat.cheatUnlocked('p_1'), false, 'the legacy per-device boolean is not an unlock');
+      } finally {
+        if (savedLs === undefined) delete globalThis.localStorage;
+        else globalThis.localStorage = savedLs;
+      }
+    }
     // the intent, and the banner's own text rule
     assert.equal(typeof actions.cheat, 'function');
     assert.equal(consts.cheatBannerText('A'), '"A"纸尿裤兜不住了!!');
