@@ -1075,6 +1075,11 @@ describe('screen helpers', () => {
     assert.equal(typeof emotes.EmoteBarrage, 'function', 'the 弹幕 layer exists');
     assert.equal(typeof emotes.tenPullOn, 'function');
     assert.equal(typeof emotes.barrageOn, 'function');
+    // the 弹幕 switch only ADDS the falling layer: the avatar bubble that shows what a player sent must never depend on
+    // it — tying them hid every sent emote in-match as soon as the switch was on
+    const teamSrc = readFileSync(path.join(ROOT, 'public/js/ui/teamPanel.js'), 'utf8');
+    assert.equal(/barrageOn/.test(teamSrc), false, 'teamPanel must not gate the bubble on 弹幕');
+    assert.match(teamSrc, /bubble \? html`<\$\{EmoteBubble\}/, 'the bubble renders whenever there is one');
     assert.equal(typeof emotes.PREF_TEN_PULL, 'string');
     assert.equal(typeof emotes.PREF_BARRAGE, 'string');
     // both default off and follow the local pref (per device). The harness has no localStorage, so one is faked here:
