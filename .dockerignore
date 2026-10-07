@@ -14,6 +14,8 @@ docs/img
 docs/research/*.md
 # game art is mounted at runtime or downloaded with --build-arg FETCH_ASSETS=1, never sent from the host
 public/assets
+# per-machine local-client state (like .cache/): baking it in makes the image advertise art it does not carry
+data/local-assets.json
 # generated from node_modules inside the image
 public/vendor
 scripts/service.env.cmd
