@@ -17,7 +17,7 @@
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { CHEAT_CODE, CHEAT_ACTIONS, CHEAT_INFINITE_FUNDS } from '../../../shared/constants.js';
 import { html } from './components.js';
-import { loadPref, savePref } from '../store.js';
+import { loadPref, savePref, useStore } from '../store.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -39,8 +39,20 @@ export const CHEAT_HOME = Object.freeze({ x: 0.78, y: 0.1 });
  */
 export const CHEAT_PANEL_W = 0.17;
 
-/** Whether this device has already typed the activation code. */
-export const cheatUnlocked = () => loadPref(PREF_UNLOCKED, false) === true;
+/**
+ * Whether this device has already unlocked the drawer **for the current server session**. The `welcome` frame hands out
+ * a new `playerId` when the server restarts (`main.js` notice: 「服务器会话已重置」, and the same comparison in
+ * `store.js sessionResetNotice`), so keying the unlock on it gives exactly "输入一次就够了，直到下次服务器重启" —
+ * closing and reopening the ball does not ask again, and a restarted server does.
+ */
+export const cheatUnlocked = (sessionId = undefined) => {
+  const rec = loadPref(PREF_UNLOCKED, null);
+  if (!rec || typeof rec !== 'object' || rec.ok !== true) return false;
+  if (sessionId === undefined) return true;                    // caller does not track sessions
+  return rec.session != null && rec.session === sessionId;
+};
+/** Remember an accepted activation code for the current server session. */
+export const rememberCheatUnlock = (sessionId = null) => savePref(PREF_UNLOCKED, { ok: true, session: sessionId });
 /** The activation code check, exported for tests: an exact match (surrounding blanks tolerated) unlocks. */
 export const cheatCodeOk = (code) => String(code ?? '').trim() === CHEAT_CODE;
 /** The five panel rows, in the panel's order (the labels are the requirement's own wording). */
@@ -102,9 +114,11 @@ export function CheatBanner({ cheats = [] }) {
  */
 export function CheatMenu({ onCheat, priv = null, disabled = false }) {
   useEffect(() => { ensureCheatCss(); }, []);
-  // the code is asked for on EVERY open — the drawer re-locks when it is closed (it used to be remembered per device,
-  // which left the panel showing its five rows with no 激活码 step after the first unlock)
-  const [unlocked, setUnlocked] = useState(false);
+  // the code is asked for ONCE PER SERVER SESSION: unlocked while `me.playerId` stays the same, asked again after the
+  // server restarts (which is what re-issues it)
+  const sessionId = useStore((s) => s.me?.playerId ?? null);
+  const [unlocked, setUnlocked] = useState(() => cheatUnlocked(sessionId));
+  useEffect(() => { setUnlocked(cheatUnlocked(sessionId)); }, [sessionId]);
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState('');
   const [pos, setPos] = useState(() => clampPos(loadPref(PREF_POS, null), CHEAT_HOME));
@@ -115,10 +129,11 @@ export function CheatMenu({ onCheat, priv = null, disabled = false }) {
   const submitCode = () => {
     if (!cheatCodeOk(code)) return;
     setUnlocked(true);
+    rememberCheatUnlock(sessionId);
     setCode('');
   };
-  /** Close the drawer and re-lock it, so the next open asks for the code again. */
-  const close = () => { setOpen(false); setUnlocked(false); setCode(''); };
+  /** Close the drawer — it STAYS unlocked for this server session, so reopening the ball does not ask again. */
+  const close = () => { setOpen(false); setCode(''); };
 
   // ONE drag handler for the whole control: the ball is its own handle, the panel is dragged by its title bar. A press
   // that starts ON a child button (✕ / i) never begins a drag, so the button keeps an ordinary click — capturing the
