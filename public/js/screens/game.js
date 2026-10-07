@@ -79,6 +79,8 @@ import { ChoiceOverlay } from '../ui/choiceOverlay.js';
 import { EnemyDrawer } from '../ui/enemyDrawer.js';
 import { Ticker } from '../ui/ticker.js';
 import { EmoteWheel, EmoteBarrage, barrageOn } from '../ui/emotes.js';
+// 作弊菜单 (fork 三, every mode): the 悬浮球 + panel and the red warning banner
+import { CheatMenu, CheatBanner } from '../ui/cheatMenu.js';
 import { EffectsList } from '../ui/effectsList.js';
 import { CombatHud } from '../ui/combatHud.js';
 import { SettingsModal } from '../ui/settings.js';
@@ -188,6 +190,8 @@ function MatchScreen() {
   const myId = useStore((s) => s.me.playerId);
   const conn = useStore((s) => s.connection, shallowEqual);
   const emotes = useStore((s) => s.emotes);
+  // 作弊菜单 (fork 三): the m.cheat warning banners
+  const cheats = useStore((s) => s.cheats);
   const roomSolo = useStore((s) => s.room?.mode === 'solo');
   const spectator = useStore((s) => isSpectating(s.room, s.me.playerId));
   const gd = useGameData();
@@ -1284,6 +1288,8 @@ function MatchScreen() {
       ready=${phase === PHASE.PREP && !!priv?.ready} />` : null}
 
     <div class="gm__hud" ref=${hudElRef}>
+      <${CheatMenu} priv=${priv} onCheat=${(action, on) => actions.cheat(action, on)} disabled=${conn.status !== 'online'} />
+      <${CheatBanner} cheats=${cheats} />
       <${TopBar} pub=${pub} priv=${priv} conn=${conn} hud=${hud} total=${total} drawer=${drawer}
         onExit=${() => setExitOpen(true)} onDrawer=${(t) => setDrawer((d) => (d ? null : t))} onReady=${toggleReady}
         readyBusy=${readyBusy} readyCount=${readyCount} playerCount=${solo ? 1 : aliveCount}

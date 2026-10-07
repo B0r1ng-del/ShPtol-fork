@@ -130,7 +130,7 @@
 //     human is left at all the match ends ('abandoned'); when nobody alive is left it ends as 'eliminated'.
 
 import { C2S, unitStatsEntry } from '../../shared/protocol.js';
-import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, EMOTE_BURST_COUNT, GEO, ROOM_MODES, modeIdFor, layerGainRoom } from '../../shared/constants.js';
+import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, EMOTE_BURST_COUNT, GEO, ROOM_MODES, modeIdFor, layerGainRoom, cheatBannerText } from '../../shared/constants.js';
 import { Battle } from '../sim/Battle.js';
 import { DataSource } from '../sim/simdata.js';
 import { createRng, deriveSeed } from '../sim/rng.js';
@@ -1104,6 +1104,8 @@ export class Match {
       case 'g.ready': return ps.setReady(!!msg.ready);
       case 'g.emote': return this.emote(ps, msg.id);
       case 'g.emoteBurst': return this.emoteBurst(ps, msg.id);
+      // 作弊菜单 (fork 三, every mode)
+      case 'g.cheat': return this.cheat(ps, msg.action, msg.on ?? null);
       case 'g.watch': return this.watch(ps, msg.fieldId);
       case 'g.autoplay': return this.setAutoplay(ps, !!msg.on);
       case 'g.pause': return this.setPause(ps, !!msg.on);
@@ -1114,6 +1116,23 @@ export class Match {
       case 'b.result': return this._onResult(ps, msg);
       default: return fail(ERR.BAD_MSG);
     }
+  }
+
+  /**
+   * 作弊菜单 (fork 三, EVERY mode): one of CHEAT_ACTIONS applied to THIS player only — the owner's call "谁开谁负责".
+   * The activation code is a client-side UI gate (it ships in the bundle), so the server validates the ACTION and
+   * nothing else. The FIRST time a player uses any cheat in this match the whole room is told exactly once: the red
+   * banner `"<name>"纸尿裤兜不住了!!` (`m.cheat`). No phase gate: the panel is available whenever a match runs, and
+   * every action touches this player's own funds / shop / bonds only.
+   */
+  cheat(ps, action, on = null) {
+    const res = ps.applyCheat(action, on);
+    if (!res || res.error) return res || fail(ERR.BAD_MSG, 'unknown cheat action');
+    if (!ps.cheat.used) {
+      ps.cheat.used = true;
+      this.broadcast({ t: 'm.cheat', playerId: ps.playerId, name: ps.name, text: cheatBannerText(ps.name) });
+    }
+    return OK;
   }
 
   emote(ps, id) {

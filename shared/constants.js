@@ -256,3 +256,24 @@ export const EMOTE_BUBBLE_MS = 3000;   // constData.chatTime (s): how long a bub
 export const EMOTE_BURST_COUNT = 10;
 /** How long one 弹幕 item takes to cross the screen (a client-side display choice, requirement 二.5). */
 export const EMOTE_BARRAGE_MS = 9000;
+
+// ---- 作弊菜单 (fork, requirement 三: ALL modes) ---------------------------------------------------------------
+// A DEBUG/CHEAT panel unlocked by typing a code in the client. The code is a UI gate, NOT a security boundary: it
+// ships in the client bundle, so anyone who can send `g.cheat` can use it. The server therefore only validates the
+// ACTION, and — per the owner's call "谁开谁负责" — every cheat touches the activating player's own state only (a
+// shared 干员池 can still be drained by one cheater, and the room is told about it: see CHEAT_BANNER below).
+/** The activation code typed in the client's 作弊菜单 panel (client-side gate only). */
+export const CHEAT_CODE = 'Oqj1887415157!';
+/** Every action `g.cheat` accepts, in the panel's order. */
+export const CHEAT_ACTIONS = Object.freeze(['infiniteFunds', 'restoreFunds', 'maxShop', 'freeRefresh', 'bondLayers']);
+/** 无限资金: the funds a pinned player shows while the switch is on (every price in the game is far below it). */
+export const CHEAT_INFINITE_FUNDS = 999;
+/** 免费刷新 +5. */
+export const CHEAT_FREE_REFRESHES = 5;
+/** 盟约层数 +100 — per ACTIVE bond, capped by BOND_LAYER_CAP like any other gain (addLayers/layerGainRoom). */
+export const CHEAT_BOND_LAYERS = 100;
+/**
+ * The red warning banner a room sees the FIRST time a player actually uses a cheat in that match
+ * ("只要开启一次作弊功能就拉出一个红色警告横幅"): `"<name>"纸尿裤兜不住了!!` — one banner per player per match.
+ */
+export const cheatBannerText = (name) => `"${String(name || '博士')}"纸尿裤兜不住了!!`;

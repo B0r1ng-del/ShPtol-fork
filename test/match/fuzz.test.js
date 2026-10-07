@@ -4,7 +4,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { validateC2S, C2S } from '../../shared/protocol.js';
-import { ERR, EMOTES } from '../../shared/constants.js';
+import { ERR, EMOTES, CHEAT_ACTIONS } from '../../shared/constants.js';
 import { createRng } from '../../server/sim/rng.js';
 import { DATA, makeMatch, checkInvariants } from './harness.js';
 
@@ -35,6 +35,8 @@ function randomIntent(rng, m, ps) {
     case 'g.emote': return { t, id: rng.pick(EMOTES) };
     // 一键十连 (fork 二.5): `id` is whitelisted against EMOTES, so only a real emote id passes validateC2S
     case 'g.emoteBurst': return { t, id: rng.pick(EMOTES) };
+    // 作弊菜单 (fork 三): `action` is whitelisted against CHEAT_ACTIONS, `on` is optional
+    case 'g.cheat': return rng() < 0.7 ? { t, action: rng.pick(CHEAT_ACTIONS) } : { t, action: rng.pick(CHEAT_ACTIONS), on: rng() < 0.5 };
     case 'g.watch': return { t, fieldId: rng.pick(['n:p_0', 'n:p_1', 'n:ai_0', 'u', 'b1', 'b2', 'zz', '']) };
     case 'g.autoplay': return { t, on: rng() < 0.05 };
     case 'g.pause': return { t, on: rng() < 0.5 };

@@ -1,0 +1,81 @@
+/* ==========================================================================================
+   css/cheat.css — 作弊菜单 (fork, requirement 三): the 悬浮球, the draggable panel and the red 警告横幅.
+   Every geometry is a rem of the 19.2 × 10.8 design viewport (theme.css html { font-size: clamp(…100vw/19.2…) }),
+   like the rest of the HUD. Loaded by ui/cheatMenu.js when the page does not link it.
+   ========================================================================================== */
+
+.cheat { position: absolute; inset: 0; z-index: 60; pointer-events: none; }
+.cheat > * { pointer-events: auto; }
+
+/* ---- 悬浮球 (draggable; its position is a viewport fraction from the prefs) ---- */
+.cheat-ball {
+  position: absolute; width: .52rem; height: .52rem; margin: -.26rem 0 0 -.26rem;
+  display: grid; place-items: center; font-size: .24rem; line-height: 1;
+  color: var(--mint-400); background: rgba(8, 11, 10, .82);
+  border: 2px solid var(--mint-700); border-radius: 50%; cursor: grab;
+  box-shadow: 0 .04rem .16rem rgba(0, 0, 0, .55);
+  touch-action: none; opacity: .55; transition: opacity var(--t-fast), transform var(--t-fast), border-color var(--t-fast);
+}
+.cheat-ball:hover, .cheat-ball.is-on { opacity: 1; border-color: var(--mint-400); }
+.cheat-ball:active { cursor: grabbing; transform: scale(.96); }
+.cheat-ball.is-locked { color: var(--text-dim); border-color: var(--line-3); }
+
+/* ---- panel (draggable by its title bar) ---- */
+.cheat-panel {
+  position: absolute; width: 3.5rem; transform: translate(-0%, -0%);
+  background: linear-gradient(180deg, rgba(14, 19, 17, .97), rgba(8, 11, 10, .98));
+  border: 1px solid var(--line-2); border-top: 2px solid var(--gold);
+  box-shadow: 0 .1rem .4rem rgba(0, 0, 0, .6);
+}
+.cheat-panel__bar {
+  display: flex; align-items: center; gap: .06rem; padding: .06rem .08rem;
+  background: rgba(0, 0, 0, .5); border-bottom: 1px solid var(--line-2); cursor: grab; touch-action: none;
+}
+.cheat-panel__bar:active { cursor: grabbing; }
+.cheat-panel__crown { color: var(--gold); font-size: .18rem; }
+.cheat-panel__title { font-size: .17rem; letter-spacing: .08em; color: var(--text-hi); }
+.cheat-panel__micro { flex: 1; font-size: .11rem; letter-spacing: .28em; color: var(--mint-400); }
+.cheat-panel__x { width: .22rem; height: .22rem; line-height: 1; color: var(--text-md); background: none; border: 0; cursor: pointer; }
+.cheat-panel__x:hover { color: var(--red-premium); }
+.cheat-panel__body { display: flex; flex-direction: column; gap: .05rem; padding: .08rem; }
+.cheat-panel__body--locked { gap: .06rem; }
+.cheat-panel__foot { padding: .02rem .08rem .06rem; font-size: .11rem; color: var(--text-dim); text-align: right; }
+
+.cheat-row {
+  display: flex; align-items: center; justify-content: space-between; gap: .08rem;
+  height: .34rem; padding: 0 .1rem; font-size: .15rem; letter-spacing: .04em; cursor: pointer;
+  color: var(--text-md); background: rgba(8, 11, 10, .8); border: 1px solid var(--line-2); text-align: left;
+}
+.cheat-row:hover:not(:disabled) { color: var(--text-hi); border-color: var(--mint-400); }
+.cheat-row:disabled { opacity: .5; cursor: not-allowed; }
+.cheat-row__label { flex: 1; }
+.cheat-row--go { justify-content: center; color: var(--text-on-mint); background: var(--mint-500); border-color: var(--mint-400); font-weight: 700; }
+.cheat-row--switch.is-on { color: var(--text-on-mint); background: var(--mint-500); border-color: var(--mint-400); font-weight: 700; }
+
+.cheat-switch { position: relative; width: .44rem; height: .2rem; background: rgba(0, 0, 0, .6); border: 1px solid var(--line-3); border-radius: .1rem; flex: none; }
+.cheat-switch i { position: absolute; top: 1px; left: 1px; width: .16rem; height: .16rem; border-radius: 50%; background: var(--text-dim); transition: left var(--t-fast), background var(--t-fast); }
+.cheat-row--switch.is-on .cheat-switch i { left: calc(100% - .17rem); background: #0b1822; }
+
+.cheat-code {
+  height: .32rem; padding: 0 .1rem; font-size: .15rem; color: var(--text-hi);
+  background: rgba(0, 0, 0, .6); border: 1px solid var(--line-2);
+}
+.cheat-code:focus { outline: none; border-color: var(--mint-400); }
+
+/* ---- 红色警告横幅: "「<name>」纸尿裤兜不住了!!" ---- */
+.cheat-banner {
+  position: absolute; left: 50%; top: .16rem; transform: translateX(-50%);
+  display: flex; align-items: center; gap: .1rem; max-width: 80vw;
+  padding: .08rem .18rem; font-size: .2rem; font-weight: 900; letter-spacing: .06em; color: #fff5f4;
+  background: linear-gradient(180deg, #d81b12, #8c0f09); border: 2px solid #ff7a6e;
+  box-shadow: 0 0 .34rem rgba(255, 40, 24, .7); animation: cheat-banner-in var(--t-slow) var(--ease-out);
+  z-index: 70;
+}
+.cheat-banner__mark { display: grid; place-items: center; width: .3rem; height: .3rem; background: #fff5f4; color: #8c0f09; border-radius: 50%; font-size: .22rem; }
+.cheat-banner__text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@keyframes cheat-banner-in { from { opacity: 0; transform: translate(-50%, -.3rem); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .cheat-banner { animation: none; }
+  .cheat-ball, .cheat-switch i { transition: none; }
+}

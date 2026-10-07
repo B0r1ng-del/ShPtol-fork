@@ -134,6 +134,33 @@ must still leave the official behaviour alone when it is switched off.
   - `test/fork-emote-burst.test.js` covers the server half (ten frames, one cooldown shared with `g.emote`, unknown id
     refused without sending or charging the cooldown, works in 终极模拟 and in a solo room alike); the two pref helpers
     and the intent wiring are covered in `test/client-static.test.js`.
+- **三 作弊菜单** (EVERY mode). The owner's call is **"谁开谁负责"**: every cheat touches the activating player's own
+  state, there is no room-wide switch, and the room is TOLD instead.
+  - **激活** — `CHEAT_CODE` (`Oqj1887415157!`, `shared/constants.js`) is typed into the panel. The code is a **client-side
+    UI gate, not a security boundary** — it ships in the bundle, so anyone who can send `g.cheat` can use it; the server
+    therefore validates the ACTION only (`shared/protocol.js`). The unlock is remembered per device
+    (`public/js/ui/cheatMenu.js` `PREF_UNLOCKED`).
+  - **UI** — a **draggable 悬浮球** (`PREF_BALL`) opens the panel, and the panel is **draggable by its title bar**
+    (`PREF_PANEL`, "拖拽标题栏移动"). Both positions are stored as viewport fractions and clamped by `clampPos()` on
+    every read, so a position saved on a large screen can never leave the ball off-screen on a small one.
+    Styles: `public/css/cheat.css` (injected on first use, like `emotes.js`).
+  - **命令** — `g.cheat { action, on? }` with `action ∈ CHEAT_ACTIONS`, applied by `PlayerState.applyCheat`:
+    无限资金 (`infiniteFunds`, a switch: `spend()` stops taking funds and `_payable()` accepts any price, the panel's
+    number is topped up to `CHEAT_INFINITE_FUNDS`, and the pre-switch funds are captured), 复原资金 (`restoreFunds`,
+    puts that captured value back and switches the flag off), 商店满级 (`maxShop`, the mode's top level + a free
+    reroll), 免费刷新 +5 (`freeRefresh`), 盟约层数 +100 (`bondLayers`, +`CHEAT_BOND_LAYERS` on every ACTIVE bond
+    through `addLayers`, so `BOND_LAYER_CAP` 999 still holds; refused with `BAD_TARGET` when no bond is active).
+  - **Two invariants the fuzzer taught us** (`test/match/fuzz.test.js` sends random `g.cheat` intents): a cheat is
+    refused once the player is eliminated (`applyCheat` returns `ERR.ELIMINATED` like every other intent), because
+    `maxShop` would otherwise re-populate an eliminated player's shop ("eliminated but keeps shop/offers/bounties"); and
+    `eliminate()` clears the whole cheat state, because an eliminated player must have `funds === 0` ("eliminated with
+    funds 999+0").
+  - **红色警告横幅** — the FIRST time a player uses any cheat in a match, `Match.cheat` broadcasts `m.cheat` once
+    (per player per match) and `CheatBanner` shows it for `CHEAT_BANNER_MS`: `"<name>"纸尿裤兜不住了!!`
+    (`cheatBannerText`). It is a room-wide broadcast on purpose — that is what "谁开谁负责" looks like.
+  - `test/fork-cheat-menu.test.js` covers the server half (the protocol, all five actions, the funds round trip, the
+    per-player isolation, the once-only banner, and that the official `NO_FUNDS` path still refuses); the client half
+    (code check, the five entries, `clampPos`, the store/`main.js` wiring) is in `test/client-static.test.js`.
 
 ## Fork change log
 
@@ -145,3 +172,4 @@ must still leave the official behaviour alone when it is switched off.
 | 二.3 敌人属性调整 | R4 on: ordinary +10 % HP; leader +20 % HP/+20 % DEF/+8 % ATK; hidden core +35 % HP/+35 % DEF/+16 % ATK — HP per boss id | `tools/fork-overrides.mjs` (`enemyAdjust`), `server/match/gamedata.js` (`enemyExtras`/`bossHpExtra`), `server/match/waves.js`, `server/match/finalAssault.js`, `test/fork-ultimate-enemy-stats.test.js` |
 | 二.4 机变去时限 + 投票 | untimed, parallel draft with a 随机分配 vote (half the alive players resolves it randomly, one card each; 悬赏 never drawn and never voted on) + the AC-4 机变 schedule for the fork mode | `tools/fork-overrides.mjs` (`spDraft`, `applyForkChoices`), `server/match/Match.js` (SP_DRAFT), `server/match/gamedata.js` (`spDraftRules`), `shared/protocol.js` (`g.choiceRandom`), `server/match/audit.js`, `public/js/ui/choiceOverlay.js`, `public/js/ui/gameLogic.js`, `public/js/ui/gameActions.js`, `public/js/screens/game.js`, `test/fork-ultimate-sp-vote.test.js` |
 | 二.5 表情十连 + 弹幕 | EVERY mode: a 一键十连 switch (one tap → `g.emoteBurst` → ten `m.emote` frames on one cooldown) and a local 弹幕 display switch | `shared/constants.js` (`EMOTE_BURST_COUNT`/`EMOTE_BARRAGE_MS`), `shared/protocol.js`, `server/match/Match.js` (`emoteBurst`), `public/js/ui/emotes.js`, `public/js/ui/teamPanel.js`, `public/js/ui/gameActions.js`, `public/js/screens/game.js`, `public/css/emotes.css`, `test/fork-emote-burst.test.js` |
+| 三 作弊菜单 | EVERY mode: activation code, draggable 悬浮球 + draggable panel, five server-side cheats on the activating player only, and the once-per-player red banner `"<name>"纸尿裤兜不住了!!` | `shared/constants.js` (`CHEAT_*`/`cheatBannerText`), `shared/protocol.js` (`g.cheat`, `m.cheat`), `server/match/PlayerState.js` (`applyCheat`, `_payable`, `spend`, `eliminate`), `server/match/Match.js` (`cheat`), `public/js/ui/cheatMenu.js`, `public/css/cheat.css`, `public/js/ui/gameActions.js`, `public/js/screens/game.js`, `public/js/main.js`, `public/js/store.js`, `test/fork-cheat-menu.test.js` |

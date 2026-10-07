@@ -1,7 +1,7 @@
 // Normative message catalogue (DESIGN §8). Used by server (validation) and client (building requests).
 // Every client→server message is `{ t, rid?, ...fields }`. Unknown `t` or invalid fields ⇒ ERR.BAD_MSG.
 
-import { DIFFICULTIES, NAME_MAX_LEN, ROOM_CODE_LEN, ROOM_MODES, ULTIMATE_SEATS, EMOTES, GEO } from './constants.js';
+import { DIFFICULTIES, NAME_MAX_LEN, ROOM_CODE_LEN, ROOM_MODES, ULTIMATE_SEATS, CHEAT_ACTIONS, EMOTES, GEO } from './constants.js';
 
 // ---- tiny validators -------------------------------------------------------
 const isInt = (v, lo = -Infinity, hi = Infinity) => Number.isInteger(v) && v >= lo && v <= hi;
@@ -290,6 +290,9 @@ export const C2S = {
   'g.emote': { id: (v) => EMOTES.includes(v) },
   // 一键十连 (fork 二.5): one send broadcasts the same emote EMOTE_BURST_COUNT times, on the single-send cooldown
   'g.emoteBurst': { id: (v) => EMOTES.includes(v) },
+  // 作弊菜单 (fork 三, every mode): one of CHEAT_ACTIONS. The activation code is a CLIENT-side gate only (it ships in
+  // the bundle), so the server validates the action and nothing else; `on` is the 无限资金 switch's new value.
+  'g.cheat': { action: (v) => CHEAT_ACTIONS.includes(v), on: (v) => v == null || typeof v === 'boolean', $optional: ['on'] },
   'g.watch': { fieldId: (v) => isStr(v, 32) },
   'g.autoplay': { on: isBool },
   // solo pause (official PauseUp / ResumeUp, DESIGN §14): freezes the running battle (field clock, deadlines, the
@@ -318,6 +321,8 @@ export const S2C = [
   'welcome', 'ok', 'error', 'pong',
   'room.state', 'room.closed',
   'm.public', 'm.private', 'm.field', 'm.toast', 'm.ticker', 'm.emote', 'm.result',
+  // 作弊菜单 (fork 三): the red warning banner the whole room sees the first time a player uses a cheat
+  'm.cheat',
   // m.unitStats { seq, round, units: [unitStatsEntry] } — the answer to g.unitStats (the requester only)
   'm.unitStats',
   // client-side combat (DESIGN §14): b.start { battleId, fieldId, kind, spec, authoritative, startAt, serverNow, elapsed,

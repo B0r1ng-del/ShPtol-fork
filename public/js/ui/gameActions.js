@@ -72,6 +72,8 @@ export const actions = {
   emote: (id) => act('g.emote', { id }, { quiet: true }),
   // 一键十连 (fork 二.5): one tap sends the same emote ten times
   emoteBurst: (id) => act('g.emoteBurst', { id }, { quiet: true }),
+  // 作弊菜单 (fork 三, every mode): one CHEAT_ACTIONS entry; `on` only means something for 无限资金
+  cheat: (action, on = null) => act('g.cheat', on == null ? { action } : { action, on }, { quiet: true }),
   watch: (fieldId) => act('g.watch', { fieldId }, { sfx: 'tab' }),
   autoplay: (on) => act('g.autoplay', { on }),
   // solo battles only (ui/matchStatus.js pauseAvailable): m.public.paused follows
