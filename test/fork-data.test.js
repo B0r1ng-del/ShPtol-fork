@@ -67,7 +67,9 @@ describe('fork data layer (tools/fork-overrides.mjs ⇄ data/config.json)', () =
   test('the fork room starts from the AC-4 table and shares no object with the base mode', () => {
     const m = config.modes[FORK_MODE_ID];
     const base = config.modes[FORK_BASE_MODE_ID];
-    for (const key of ['rounds', 'enemyScale', 'spRounds', 'shopSlots', 'upgradePrices', 'maxShopLevel',
+    // fields the fork has NOT (yet) changed: they must still mirror AC-4 exactly, and be their own copies. A fork
+    // change moves its field OUT of this list into its own assertion below (二.1: bans; 二.2: shopSlots; …).
+    for (const key of ['rounds', 'enemyScale', 'spRounds', 'upgradePrices', 'maxShopLevel',
       'stages', 'bossWeights', 'hiddenBossWeights', 'activeBondIds', 'inactiveBondIds', 'inactiveEnemyKeys',
       'lastRound', 'bossRound', 'hiddenRound', 'combatTimeLimit', 'bossHpScale', 'levelTagColors']) {
       assert.deepEqual(m[key], base[key], `${FORK_MODE_ID}.${key} still mirrors ${FORK_BASE_MODE_ID}`);
@@ -91,5 +93,19 @@ describe('fork data layer (tools/fork-overrides.mjs ⇄ data/config.json)', () =
       ['·作战环境无比困难', '·出现极度危险的敌人'],
       'the official AC-4 card does not change',
     );
+  });
+
+  test('二.2: the fork mode carries the shop-slot table (one 干员槽 per level, the last upgrade a 道具槽)', () => {
+    const m = config.modes[FORK_MODE_ID];
+    assert.deepEqual(m.shopSlots, {
+      1: { chess: 3, item: 1 }, 2: { chess: 4, item: 1 }, 3: { chess: 5, item: 1 },
+      4: { chess: 6, item: 1 }, 5: { chess: 7, item: 1 }, 6: { chess: 7, item: 2 },
+    });
+    assert.deepEqual(config.modes[FORK_BASE_MODE_ID].shopSlots, {
+      1: { chess: 3, item: 1 }, 2: { chess: 4, item: 1 }, 3: { chess: 4, item: 1 },
+      4: { chess: 5, item: 1 }, 5: { chess: 5, item: 1 }, 6: { chess: 5, item: 1 },
+    }, 'the official AC-4 table stays as it was');
+    assert.deepEqual(m.upgradePrices, [5, 8, 11, 12, 13], 'the upgrade prices are the AC-4 ones');
+    assert.equal(m.maxShopLevel, 6);
   });
 });
