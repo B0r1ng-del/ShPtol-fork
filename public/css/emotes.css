@@ -49,9 +49,9 @@
    and the CSS fallback plate all use that geometry. */
 .ewheel__panel {
   position: absolute; left: -.15rem; bottom: calc(100% + .02rem); z-index: 5;
-  /* the plate is 2.31rem tall; the extra .17rem at the bottom is the strip the two fork switches live in (they used to
-     be the only statically-flowed child, so they landed on top of the emote grid) */
-  width: 3.13rem; height: 2.48rem; padding: 0; box-sizing: border-box;
+  /* the plate art is 2.31rem tall; the panel is 2.66rem so that the .49rem extension band (::after below) is INSIDE it
+     — that band is where 一键十连 / 弹幕 live, so the two switches belong to the panel instead of floating under it */
+  width: 3.13rem; height: 2.66rem; padding: 0; box-sizing: border-box;
   background: none; border: 0; border-radius: 0; box-shadow: none;
   transform-origin: .45rem 100%;
   animation: emo-panel-in 160ms var(--ease-out);
@@ -64,6 +64,15 @@
 /* the sprite is pinned to the plate's own 3.13 × 2.31rem instead of being stretched over the taller box */
 .ewheel__panel.has-sprite { background: var(--ewheel-bg) left top / 3.13rem 2.31rem no-repeat; }
 .ewheel__panel.has-sprite::before { content: none; }
+/* the extension band that makes the panel read as ONE taller plate: same colour and 1px inner hairline as `::before`,
+   starting exactly at the plate's own 2.12rem bottom edge, with rounded bottom corners. Generated content paints after
+   the panel's real children, so the switches carry a `z-index` to stay above it. */
+.ewheel__panel::after {
+  content: ''; position: absolute; left: .15rem; top: 2.11rem; width: 2.82rem; height: .49rem;
+  background: rgba(19, 19, 19, .92);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .07), 0 .04rem .16rem rgba(0, 0, 0, .5);
+  border-radius: 0 0 .06rem .06rem;
+}
 .ewheel__viewport { position: absolute; left: .205rem; top: .19rem; width: 2.71rem; height: 1.78rem; overflow: hidden; touch-action: pan-y; cursor: grab; }
 .ewheel__viewport:active { cursor: grabbing; }
 .ewheel__page {
@@ -156,9 +165,9 @@
 
 /* ---- fork 二.5: the two emote switches in the panel ---------------------------------------------- */
 /* 二.5 的两个开关：面板里其余子元素全是绝对定位，所以这一行原来落在普通流里、压在表情格子上（用户看到的坏排版）。
-   现在给它自己的一条带子，钉在底板正下方的空位里，两个开关各占一半宽度。 */
-.ewheel__opts { position: absolute; left: .15rem; top: 2.14rem; width: 2.82rem; height: .3rem; display: flex; gap: .06rem; padding: 0; }
-.ewheel__opts .ewheel__opt { flex: 1 1 0; min-width: 0; height: .3rem; padding: 0 .04rem; font-size: .13rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+   现在它们坐在面板加高出来的那条延伸带子里（见 .ewheel__panel::after），各占一半宽度；z-index 让它们压在带子之上。 */
+.ewheel__opts { position: absolute; left: .22rem; top: 2.21rem; width: 2.68rem; height: .28rem; display: flex; gap: .08rem; padding: 0; z-index: 1; }
+.ewheel__opts .ewheel__opt { flex: 1 1 0; min-width: 0; height: .28rem; padding: 0 .04rem; font-size: .13rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ewheel__opt {
   flex: 1; height: .26rem; padding: 0 .06rem; font-size: .13rem; letter-spacing: .06em;
   color: var(--text-md); background: rgba(8, 11, 10, .78); border: 1px solid var(--line-2); cursor: pointer;
