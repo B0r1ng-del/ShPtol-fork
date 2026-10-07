@@ -89,14 +89,16 @@
 .ewheel__item:focus-visible { outline: 2px solid var(--mint-500); outline-offset: 1px; }
 .ewheel__item:disabled { opacity: .45; cursor: default; }
 
-/* pager: ‹ dots › in the strip under the cells */
-.ewheel__dots { position: absolute; left: .15rem; width: 2.82rem; top: 1.99rem; height: .12rem; display: flex; align-items: center; justify-content: center; gap: .1rem; }
+/* pager: ‹ dots › in the strip under the cells. Every dot is the SAME square and only its colour marks the current
+   page — the active one used to be `transform: scale(1.12)`, which rendered it as a visibly taller white block that
+   stuck out of the 10px strip and read as a different kind of element. */
+.ewheel__dots { position: absolute; left: .15rem; width: 2.82rem; top: 1.99rem; height: .12rem; display: flex; align-items: center; justify-content: center; gap: .12rem; }
 .ewheel__dot {
-  position: relative; width: .11rem; height: .12rem; padding: 0; border: 0; border-radius: .015rem; background: rgba(255, 255, 255, .28);
-  transition: background-color var(--t-fast), transform var(--t-fast);
+  position: relative; width: .11rem; height: .11rem; padding: 0; border: 0; border-radius: .02rem; background: rgba(255, 255, 255, .28);
+  transition: background-color var(--t-fast), box-shadow var(--t-fast);
 }
 .ewheel__dot:hover { background: rgba(255, 255, 255, .55); }
-.ewheel__dot.is-on { background: #fff; transform: scale(1.12); }
+.ewheel__dot.is-on { background: #fff; box-shadow: 0 0 .06rem rgba(255, 255, 255, .55); }
 .ewheel__dot::before { content: ''; position: absolute; inset: -.05rem -.05rem; } /* bigger hit area */
 .ewheel__nav {
   position: absolute; top: 1.94rem; width: .26rem; height: .22rem; display: grid; place-items: center; padding: 0; z-index: 1;
