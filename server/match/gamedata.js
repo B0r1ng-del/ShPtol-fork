@@ -437,6 +437,26 @@ export class GameData {
     return this._adjMul(hidden ? a.hidden : a.leader, 'hp');
   }
 
+  /** The mode's 机变 rules (`modes[modeId].spDraft`; fork 二.4), or null. */
+  get spDraft() {
+    const d = this.mode.spDraft;
+    return d && typeof d === 'object' && !Array.isArray(d) ? d : null;
+  }
+
+  /**
+   * The mode's 机变 draft rules, normalised: `{ untimed, parallel, randomFamilies }` — all off (and
+   * `randomFamilies` null, i.e. no vote button) without an `spDraft` block, so every official mode is unchanged.
+   * `randomFamilies` is the allow-list of card families the random allocation may hand out; a 悬赏 card is never
+   * eligible even when listed (`Match.randomChoiceEligible`).
+   */
+  get spDraftRules() {
+    const d = this.spDraft;
+    if (!d) return { untimed: false, parallel: false, randomFamilies: null };
+    const vote = d.randomVote && typeof d.randomVote === 'object' && !Array.isArray(d.randomVote) ? d.randomVote : null;
+    const fams = vote && Array.isArray(vote.families) ? vote.families.filter((f) => typeof f === 'string') : [];
+    return { untimed: d.untimed === true, parallel: d.parallel === true, randomFamilies: fams.length ? fams : null };
+  }
+
   timer(key) {
     const t = this.config.timers && this.config.timers[key];
     return typeof t === 'number' && Number.isFinite(t) && t > 0 ? t : DEFAULTS.timers[key] ?? 10;

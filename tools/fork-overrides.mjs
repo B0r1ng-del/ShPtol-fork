@@ -96,6 +96,23 @@ export function forkUltimateMode(modes) {
       leader: { hp: 1.2, def: 1.2, atk: 1.08 },
       hidden: { hp: 1.35, def: 1.35, atk: 1.16 },
     },
+    // 机变阶段改造 (requirement 二.4): the draft has NO time limit, every alive player picks at the same time instead
+    // of waiting for a turn, and any player may vote for a random allocation instead of picking. As soon as HALF of the
+    // alive players have voted (votes × 2 ≥ alive) the system hands the cards out at random — one per alive player,
+    // over their own pick — and the round moves on.
+    //   * UNTIMED — "移除原有的时间限制"; the draft ends when every alive player has picked or voted.
+    //   * PARALLEL — the sequential turn order (spFirst 30 s / spTurn 16 s) would be pointless without a clock: with
+    //     no timer, waiting on one player at a time could stall the round forever, so everyone decides at once.
+    //   * randomVote.families — the card families the random draw may hand out. 悬赏 (bounty) is deliberately NOT
+    //     listed: "悬赏类不要添加随机机制" — its card adds its enemies to the PICKER's own next battles, so handing it
+    //     to somebody else would break the attribution. In a 悬赏决策 draft the vote button is simply not offered.
+    // Below half the votes each player keeps the card they picked; a player who only voted and lost the vote takes
+    // nothing this round (the phase still ends).
+    spDraft: {
+      untimed: true,
+      parallel: true,
+      randomVote: { families: ['supply', 'shop', 'tactic'] },
+    },
   };
 }
 
@@ -112,4 +129,30 @@ export function applyForkOverrides(config) {
   const mode = forkUltimateMode(modes);
   if (!mode) return config;
   return { ...config, modes: { ...modes, [FORK_MODE_ID]: mode } };
+}
+
+/**
+ * The fork's own `data/choices.json` layer: the 机变 draft schedule of the fork mode.
+ *
+ * `choices.schedule` is keyed by modeId (`schedule[modeId].rounds[r].families`, read by
+ * `server/match/choices.js:100-106 scheduleFor`), and the official data naturally has no entry for a mode that never
+ * shipped. Without this copy the fork mode falls back to a plain 道具补给 draft every 机变 round: it would no longer be
+ * "以 AC-4 为基础", and 悬赏决策 drafts would never appear at all (AC-4 R3/R9 are 100 % 悬赏, R11 mostly) — which would
+ * also make 二.4's "悬赏类不要添加随机机制" unreachable in real play. The fork therefore copies the AC-4 schedule onto
+ * its own modeId, so the mode drafts exactly like AC-4 and the vote is offered exactly where AC-4 offers a non-悬赏
+ * family.
+ *
+ * Pure and idempotent like applyForkOverrides.
+ * @param {Record<string, any>} choices `data/choices.json`
+ * @returns {Record<string, any>} a new object (or the input when the data it needs is absent)
+ */
+export function applyForkChoices(choices) {
+  if (!isPlainObject(choices)) return choices;
+  const schedule = isPlainObject(choices.schedule) ? choices.schedule : null;
+  if (!schedule) return choices;
+  // always rebuilt from the BASE mode, never from an existing fork entry: a hand-edit of the fork's own schedule is
+  // then reverted by the applier and caught by test/fork-data.test.js (the same reason applyForkOverrides overwrites)
+  const base = schedule[FORK_BASE_MODE_ID];
+  if (!isPlainObject(base)) return choices;
+  return { ...choices, schedule: { ...schedule, [FORK_MODE_ID]: cloneJson(base) } };
 }

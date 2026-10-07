@@ -95,6 +95,25 @@ exists. The fork's per-mode rules land on top of it one change at a time, each o
   `bloodPoint[difficulty]` — so the two classes are computed separately and neither can move the other's pool.
   Boss-owned runtime summons (`server/sim/content/bosses.js` `summon.hp_ratio`) never come from `enemyScale` and so
   stay outside all of it. `test/fork-ultimate-enemy-stats.test.js`.
+- **二.4 机变阶段改造** — the mode carries `spDraft: { untimed: true, parallel: true, randomVote: { families: ['supply',
+  'shop', 'tactic'] } }`. `GameData.spDraftRules` normalises it (all off without the block), `Match.enterSpDraft` turns
+  the draft untimed and parallel, and `Match.voteRandomChoice` (the `g.choiceRandom` intent, `Match.js` SP_DRAFT
+  section) tallies votes: `votes × 2 ≥ alive` resolves the draft by `resolveRandomChoice`, which shuffles the
+  random-eligible cards and the alive players and hands one card to each — over their own pick, which is the point of
+  the vote; below half every player keeps the card it picked, and a voter who picked nothing takes nothing. UNTIMED
+  ("移除原有的时间限制") means the phase ends when every alive player has picked or voted; PARALLEL replaces the
+  sequential turn order, because without a clock waiting on one player at a time could stall the round forever
+  (`g.choice` from any player, `spTurn()` = the first player still to act, the AI seats schedule themselves). 悬赏 cards
+  are never drawn (`randomChoiceEligible` refuses `family === 'bounty'`) and in a 悬赏决策 draft the vote is not offered
+  at all — "悬赏类不要添加随机机制" (a bounty adds its enemies to the PICKER's own next battles, so handing it to
+  somebody else would break the attribution). The draft's `randomOffer` in `m.public` is non-null exactly when the vote
+  is offered for that draft, so `public/js/ui/choiceOverlay.js` renders the 随机分配 button on the frame alone.
+  `server/match/audit.js` accepts a player ending after only a lost vote. `test/fork-ultimate-sp-vote.test.js`.
+- **二.4 also needed a 机变 schedule** — `choices.schedule` is keyed by modeId and the official data has no entry for a
+  mode that never shipped, so without one the fork mode fell back to a plain 道具补给 draft every round (no 悬赏 at all,
+  and the vote would have had nothing to gate). `applyForkChoices()` in `tools/fork-overrides.mjs` copies AC-4's
+  schedule onto the fork modeId in `data/choices.json`; `tools/fork-data.mjs` and `tools/build-data.mjs` apply it like
+  the config layer, and `test/fork-data.test.js` guards it with the same idempotence check.
 
 ## Fork change log
 
@@ -104,3 +123,4 @@ exists. The fork's per-mode rules land on top of it one change at a time, each o
 | 二.1 盟约不禁用 | the mode draws 0 bond bans (`bans: { core: 0, addon: 0 }`) and its card says 盟约与干员全部解锁 | `tools/fork-overrides.mjs`, `server/match/gamedata.js` (`bans()`), `test/fork-ultimate-bans.test.js` |
 | 二.2 商店升级槽位 | one 干员槽 per operator level (3→7) and a second 道具槽 at level 6 | `tools/fork-overrides.mjs` (`shopSlots`), `test/fork-ultimate-shop.test.js` |
 | 二.3 敌人属性调整 | R4 on: ordinary +10 % HP; leader +20 % HP/+20 % DEF/+8 % ATK; hidden core +35 % HP/+35 % DEF/+16 % ATK — HP per boss id | `tools/fork-overrides.mjs` (`enemyAdjust`), `server/match/gamedata.js` (`enemyExtras`/`bossHpExtra`), `server/match/waves.js`, `server/match/finalAssault.js`, `test/fork-ultimate-enemy-stats.test.js` |
+| 二.4 机变去时限 + 投票 | untimed, parallel draft with a 随机分配 vote (half the alive players resolves it randomly, one card each; 悬赏 never drawn and never voted on) + the AC-4 机变 schedule for the fork mode | `tools/fork-overrides.mjs` (`spDraft`, `applyForkChoices`), `server/match/Match.js` (SP_DRAFT), `server/match/gamedata.js` (`spDraftRules`), `shared/protocol.js` (`g.choiceRandom`), `server/match/audit.js`, `public/js/ui/choiceOverlay.js`, `public/js/ui/gameLogic.js`, `public/js/ui/gameActions.js`, `public/js/screens/game.js`, `test/fork-ultimate-sp-vote.test.js` |

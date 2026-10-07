@@ -263,6 +263,10 @@ export const C2S = {
 
   // match
   'g.infoReady': {},
+  // 机变 随机分配 vote (fork 二.4): vote for the random allocation instead of picking a card. Half of the alive players
+  // is enough — the server then hands the draft's cards out at random, one per alive player. Refused when the mode does
+  // not offer it (every official mode) or in a 悬赏决策 draft.
+  'g.choiceRandom': {},
   'g.band': { bandId: isId },
   'g.bandSkip': {},
   // the strategy highlighted in the draft screen (user playtest #4 item 4): a turn that runs out takes it while it is

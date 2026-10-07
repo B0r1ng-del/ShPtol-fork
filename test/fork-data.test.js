@@ -1,13 +1,15 @@
-// test/fork-data.test.js — the fork's data layer (tools/fork-overrides.mjs) against the committed data/config.json.
+// test/fork-data.test.js — the fork's data layer (tools/fork-overrides.mjs) against the committed data files.
 //
-// `data/config.json` is a build product of tools/build-data.mjs, which now calls applyForkOverrides() before writing.
-// `node tools/fork-data.mjs` applies the same function to the committed file in place (the small reviewable diff).
+// `data/config.json` and `data/choices.json` are build products of tools/build-data.mjs, which now calls
+// applyForkOverrides() / applyForkChoices() before writing. `node tools/fork-data.mjs` applies the same functions to the
+// committed files in place (the small reviewable diff).
 //
 // The first test is the drift guard and the reason the override is written as a pure, idempotent function:
-// applyForkOverrides(committed config) must return the committed config EXACTLY. It fails when
-//   * `data/config.json` is regenerated without the override (or hand-edited),
-//   * the fork record in `data/config.json` no longer matches what the override builds, or
-//   * someone edits data/config.json instead of tools/fork-overrides.mjs.
+// applyForkOverrides(committed config) must return the committed config EXACTLY (same for the choices schedule). It
+// fails when
+//   * a data file is regenerated without the override (or hand-edited),
+//   * the fork record in it no longer matches what the override builds, or
+//   * someone edits the data file instead of tools/fork-overrides.mjs.
 // The rest pin down what the fork's mode actually is, so a later change to it is a deliberate one.
 import { describe, test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,13 +17,15 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { applyForkOverrides, forkUltimateMode, FORK_MODE_ID, FORK_BASE_MODE_ID } from '../tools/fork-overrides.mjs';
+import { applyForkOverrides, forkUltimateMode, applyForkChoices, FORK_MODE_ID, FORK_BASE_MODE_ID } from '../tools/fork-overrides.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const readConfig = () => JSON.parse(readFileSync(join(ROOT, 'data', 'config.json'), 'utf8'));
+const readJson = (name) => JSON.parse(readFileSync(join(ROOT, 'data', `${name}.json`), 'utf8'));
+const readConfig = () => readJson('config');
 
-describe('fork data layer (tools/fork-overrides.mjs ⇄ data/config.json)', () => {
+describe('fork data layer (tools/fork-overrides.mjs ⇄ data/)', () => {
   const config = readConfig();
+  const choices = readJson('choices');
 
   test('data/config.json already carries every fork override (idempotence drift guard)', () => {
     assert.deepEqual(
@@ -125,5 +129,32 @@ describe('fork data layer (tools/fork-overrides.mjs ⇄ data/config.json)', () =
     // the official per-round table itself is untouched by 二.3 (the extras sit beside it, they do not rewrite it)
     assert.deepEqual(m.enemyScale, config.modes[FORK_BASE_MODE_ID].enemyScale);
     assert.ok(m.effectDescList.some((l) => l.includes('第 4 回合起敌人强度提升')), 'the card says so');
+  });
+
+  test('二.4: the fork mode carries the 机变 rules, and only the fork mode', () => {
+    const m = config.modes[FORK_MODE_ID];
+    assert.deepEqual(m.spDraft, { untimed: true, parallel: true, randomVote: { families: ['supply', 'shop', 'tactic'] } });
+    for (const [id, mode] of Object.entries(config.modes)) {
+      if (id === FORK_MODE_ID) continue;
+      assert.equal(mode.spDraft, undefined, `${id} must not carry a fork 机变 block`);
+    }
+    assert.ok(!m.spDraft.randomVote.families.includes('bounty'), '悬赏类不要添加随机机制');
+  });
+
+  test('二.4: data/choices.json already carries the fork schedule (the same drift guard as config.json)', () => {
+    assert.deepEqual(applyForkChoices(choices), choices, 'data/choices.json is stale — run: node tools/fork-data.mjs');
+    const fork = choices.schedule[FORK_MODE_ID];
+    const base = choices.schedule[FORK_BASE_MODE_ID];
+    assert.ok(fork, `${FORK_MODE_ID} has no 机变 schedule (the mode would fall back to a 道具补给 draft every round)`);
+    assert.deepEqual(fork, base, 'the schedule is the AC-4 one');
+    assert.notEqual(fork, base, 'and its own copy');
+    for (const r of [3, 9, 11]) {
+      assert.deepEqual(fork.rounds[String(r)].families, base.rounds[String(r)].families, `R${r} families`);
+    }
+    assert.equal(fork.rounds['3'].families[0].family, 'bounty', 'AC-4 R3 is 悬赏决策 — the fork keeps that');
+    assert.equal(applyForkChoices(null), null);
+    assert.deepEqual(applyForkChoices({}), {});
+    const noBase = { schedule: { mode_multi_hard: { rounds: {} } } };
+    assert.equal(applyForkChoices(noBase), noBase, 'without the base schedule there is nothing to copy');
   });
 });
