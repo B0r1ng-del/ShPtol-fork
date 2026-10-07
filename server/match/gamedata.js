@@ -114,7 +114,8 @@ export class GameData {
    * (撤退/死掉)變少，最後boss血條也會變少" is one community note without a proportion, kept off until confirmed (it would
    * shorten fights after eliminations, the opposite of the playtest report); `aliveCount` omitted ⇒ a full team. Solo = bloodPoint ×
    * bossHpScale.solo (0.25 = one player of four, [ASSUMED]). Leaders are never scaled by enemyScale ("领袖单位于服务器的
-   * 生命值加成不受上述加成影响").
+   * 生命值加成不受上述加成影响"). × the mode's own per-class extra (fork 二.3: `bossHpExtra` — the leader's and the
+   * hidden core's factors are separate, and each multiplies that boss's own bloodPoint).
    * @param {string} bossId
    * @param {number} [aliveCount] alive players at the Final Assault / Hidden Core start (co-op)
    * @returns {number}
@@ -125,7 +126,9 @@ export class GameData {
     let base = boss && boss.bloodPoint && Number.isFinite(boss.bloodPoint[diff]) ? boss.bloodPoint[diff] : null;
     if (base == null && boss && boss.bloodPoint) base = Object.values(boss.bloodPoint).find((v) => Number.isFinite(v)) ?? null;
     if (base == null) base = 500000;
-    return Math.max(1, Math.round(base * this.bossPoolShare(aliveCount)));
+    // × the fork's per-class extra (二.3): the leader's and the hidden core's factors are looked up separately by boss
+    // id (`bossHpExtra`), so this is a per-boss value and not one blanket multiplier over the pool. 1 officially.
+    return Math.max(1, Math.round(base * this.bossPoolShare(aliveCount) * this.bossHpExtra(bossId)));
   }
 
   /**
@@ -371,6 +374,67 @@ export class GameData {
   /** Enemy multipliers of round r = the official table (baseEnemyScale; no custom multiplier). */
   enemyScale(r) {
     return this.baseEnemyScale(r);
+  }
+
+  /**
+   * The MODE's own enemy adjustments (`modes[modeId].enemyAdjust`), or null — a fork-only extension of the official
+   * table, so the official modes keep their numbers exactly. Shape:
+   * `{ fromRound, normal: { hp }, leader: { hp, def, atk }, hidden: { hp, def, atk } }`, every value a multiplier
+   * (1.2 = +20 %); a missing field means 1.
+   */
+  get enemyAdjust() {
+    const a = this.mode.enemyAdjust;
+    return a && typeof a === 'object' && !Array.isArray(a) ? a : null;
+  }
+
+  /** Whether the mode's round-based enemy adjustment applies in round r (round ≥ fromRound; fromRound defaults to 1). */
+  enemyAdjustActive(r) {
+    const a = this.enemyAdjust;
+    if (!a) return false;
+    const from = Number.isInteger(a.fromRound) && a.fromRound > 0 ? a.fromRound : 1;
+    return (Number(r) || 0) >= from;
+  }
+
+  /** One adjustment class's multiplier for `key`, or 1 (also for a malformed entry). */
+  _adjMul(cls, key) {
+    return cls && Number.isFinite(cls[key]) && cls[key] > 0 ? cls[key] : 1;
+  }
+
+  /**
+   * The spawn multipliers of round r that sit ON TOP of the official table, by spawn class:
+   *   * `normalHp` — every ordinary spawn (leader escorts, bounty adds …), but never a 部位/part (`isPart`) and never
+   *     the leader itself, whose HP is the shared pool;
+   *   * `bossAtk` / `bossDef` — the leader (最终攻势) or the hidden core (隐秘核心), whichever round r is.
+   * All three are 1 when the mode has no adjustment or r is before `fromRound`.
+   */
+  enemyExtras(r) {
+    const one = { normalHp: 1, bossAtk: 1, bossDef: 1 };
+    if (!this.enemyAdjustActive(r)) return one;
+    const a = this.enemyAdjust;
+    const kind = Number(r) === this.hiddenRound ? a.hidden : a.leader;
+    return {
+      normalHp: this._adjMul(a.normal, 'hp'),
+      bossAtk: this._adjMul(kind, 'atk'),
+      bossDef: this._adjMul(kind, 'def'),
+    };
+  }
+
+  /**
+   * HP multiplier of ONE boss's shared pool (the fork's 二.3 "领袖和隐秘核心分开计算"): a hidden core is a boss id
+   * listed in `mode.hiddenBossWeights` (boss_8 … boss_10), anything else is a Final Assault leader. Its own
+   * `bloodPoint[difficulty]` is multiplied by that class's factor — never one blanket multiplier over the pool, so a
+   * change to the leader's number can never move the hidden core's (and vice versa).
+   * @param {string} bossId
+   * @returns {number} 1 without an adjustment (every official mode)
+   */
+  bossHpExtra(bossId) {
+    const a = this.enemyAdjust;
+    if (!a || typeof bossId !== 'string') return 1;
+    // the boss rounds are always inside the adjustment window when one exists; gate anyway so `fromRound` is honoured
+    if (!this.enemyAdjustActive(this.bossRound) && !this.enemyAdjustActive(this.hiddenRound)) return 1;
+    const hw = this.mode.hiddenBossWeights;
+    const hidden = !!(hw && typeof hw === 'object' && Object.hasOwn(hw, bossId));
+    return this._adjMul(hidden ? a.hidden : a.leader, 'hp');
   }
 
   timer(key) {

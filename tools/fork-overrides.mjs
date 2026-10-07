@@ -66,7 +66,7 @@ export function forkUltimateMode(modes) {
     // every 盟约 stays in play.
     bans: { core: 0, addon: 0 },
     // …and it says so on the difficulty card, like the official 终极模拟 ("盟约与干员全部解锁").
-    effectDescList: ['·盟约与干员全部解锁', '·作战环境无比困难', '·出现极度危险的敌人'],
+    effectDescList: ['·盟约与干员全部解锁', '·第 4 回合起敌人强度提升', '·作战环境无比困难', '·出现极度危险的敌人'],
     // 局内商店升级规则 (requirement 二.2): every operator level adds one 干员购买槽位 (3→4→5→6→7); the LAST one adds a
     // second 道具购买槽位 instead. The official AC-4 table is {3,4,4,5,5,5} with ONE item slot throughout, so the top
     // operator level is 7 slots — two more than AC-4's 5 — and level 6 carries two item slots.
@@ -79,6 +79,22 @@ export function forkUltimateMode(modes) {
       4: { chess: 6, item: 1 },
       5: { chess: 7, item: 1 },
       6: { chess: 7, item: 2 },
+    },
+    // 敌人属性调整 (requirement 二.3), from round 4 on, on top of the AC-4 table:
+    //   * ordinary enemies — never the leader, never the hidden core, never one of their 部位/parts: +10 % HP only;
+    //   * the 最终攻势 leader: +20 % HP, +20 % DEF, +8 % ATK;
+    //   * the 隐秘核心: +35 % HP, +35 % DEF, +16 % ATK.
+    // Every value is a multiplier (1.2 = +20 %). GameData.enemyExtras(r) hands the ordinary HP bonus and the leader /
+    // hidden-core ATK + DEF to server/match/waves.js per spawn, and GameData.bossHpExtra(bossId) applies the HP part
+    // PER BOSS: a leader's HP is the shared pool and the pool is `boss.bloodPoint[difficulty]`, so the 1.20 lands on
+    // boss_1…boss_7 and the 1.35 on boss_8…boss_10 separately (a hidden core is a boss id of `hiddenBossWeights`) —
+    // "领袖和隐秘核心分开计算", never one blanket multiplier over the pool. DEF is an additive percentage on the
+    // enemy's own DEF (`def × (1 + pct)`), i.e. the `defMul` spawn mod Battle.js already supports.
+    enemyAdjust: {
+      fromRound: 4,
+      normal: { hp: 1.1 },
+      leader: { hp: 1.2, def: 1.2, atk: 1.08 },
+      hidden: { hp: 1.35, def: 1.35, atk: 1.16 },
     },
   };
 }
