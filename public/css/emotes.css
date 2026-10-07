@@ -161,14 +161,18 @@
 /* ---- fork 二.5: the 弹幕 layer ------------------------------------------------------------------- */
 .ebarrage { position: absolute; inset: 0; z-index: 40; overflow: hidden; pointer-events: none; }
 .ebarrage__item {
-  position: absolute; top: calc(6% + var(--eb-lane, 0) * 9%);
+  position: absolute; top: calc(10% + var(--eb-lane, 0) * 8%);
   left: 100%; width: .56rem; height: .56rem; display: grid; place-items: center;
   filter: drop-shadow(0 .03rem .08rem rgba(0, 0, 0, .8));
   animation: emo-barrage var(--eb-ms, 9s) linear forwards;
 }
 .ebarrage__item.is-mine { filter: drop-shadow(0 0 .1rem rgba(23, 249, 183, .75)); }
 .ebarrage__item img { width: 100%; height: 100%; object-fit: contain; }
-@keyframes emo-barrage { from { transform: translateX(0); } to { transform: translateX(calc(-100vw - .56rem)); } }
+/* fully off the left edge AND transparent at the end, so nothing can linger there if a frame is dropped */
+@keyframes emo-barrage {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(calc(-100% - 100vw)); opacity: 0; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   /* the barrage is pure motion: with motion reduced, show the recent ones statically instead of disabling the feature */

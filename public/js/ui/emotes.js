@@ -216,15 +216,30 @@ export function EmoteBubble({ id, class: cls, ttl = EMOTE_BUBBLE_MS, at }) {
  * one lane per item keeps a 一键十连 from stacking ten icons on top of each other.
  * @param {{ emotes?: any[], myId?: string|null, lanes?: number }} props `emotes` = store.emotes ({ seq, playerId, id })
  */
-export function EmoteBarrage({ emotes = [], myId = null, lanes = 4 }) {
+export function EmoteBarrage({ emotes = [], myId = null, lanes = 6 }) {
   useData('local');
-  const rows = (Array.isArray(emotes) ? emotes : []).slice(-24);
+  const [, tick] = useState(0);
+  const now = Date.now();
+  // an item lives exactly as long as its flight: the ones whose animation has run out are DROPPED here, because an
+  // animation with `forwards` used to park the element against the left edge and leave it on screen for good
+  const rows = (Array.isArray(emotes) ? emotes : [])
+    .filter((e) => now - (Number.isFinite(e.at) ? e.at : now) < EMOTE_BARRAGE_MS)
+    .slice(-24);
+  const oldest = rows[0] || null;
+  useEffect(() => {
+    if (!oldest) return undefined;
+    const left = (Number.isFinite(oldest.at) ? oldest.at : Date.now()) + EMOTE_BARRAGE_MS - Date.now();
+    const t = setTimeout(() => tick((v) => v + 1), Math.max(50, left + 30));
+    return () => clearTimeout(t);
+  }, [oldest && oldest.seq, rows.length]);
   if (!rows.length) return null;
   return html`<div class="ebarrage" aria-hidden="true">
     ${rows.map((e, i) => {
       const mine = !!myId && e.playerId === myId;
+      // one LANE per item keeps a 一键十连 from stacking icons, and a small per-item delay fans them out in time as well
+      // (two items only share a lane 6 apart, i.e. ~420 ms, by which time the first is far to the left)
       return html`<span key=${e.seq} class=${cx('ebarrage__item', mine && 'is-mine')}
-        style=${`--eb-lane:${i % Math.max(1, lanes)}; --eb-ms:${EMOTE_BARRAGE_MS}ms; animation-delay:${Math.min(i, 9) * 90}ms`}>
+        style=${`--eb-lane:${i % Math.max(1, lanes)}; --eb-ms:${EMOTE_BARRAGE_MS}ms; animation-delay:${Math.min(i, 8) * 70}ms`}>
         <${EmoteArt} id=${e.id} />
       </span>`;
     })}
