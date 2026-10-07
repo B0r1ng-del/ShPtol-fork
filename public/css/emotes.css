@@ -49,7 +49,9 @@
    and the CSS fallback plate all use that geometry. */
 .ewheel__panel {
   position: absolute; left: -.15rem; bottom: calc(100% + .02rem); z-index: 5;
-  width: 3.13rem; height: 2.31rem; padding: 0; box-sizing: border-box;
+  /* the plate is 2.31rem tall; the extra .17rem at the bottom is the strip the two fork switches live in (they used to
+     be the only statically-flowed child, so they landed on top of the emote grid) */
+  width: 3.13rem; height: 2.48rem; padding: 0; box-sizing: border-box;
   background: none; border: 0; border-radius: 0; box-shadow: none;
   transform-origin: .45rem 100%;
   animation: emo-panel-in 160ms var(--ease-out);
@@ -59,7 +61,8 @@
   content: ''; position: absolute; left: .15rem; top: .13rem; width: 2.82rem; height: 1.99rem; border-radius: .06rem;
   background: rgba(19, 19, 19, .92); box-shadow: 0 .04rem .16rem rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(255, 255, 255, .07);
 }
-.ewheel__panel.has-sprite { background: var(--ewheel-bg) center / 100% 100% no-repeat; }
+/* the sprite is pinned to the plate's own 3.13 × 2.31rem instead of being stretched over the taller box */
+.ewheel__panel.has-sprite { background: var(--ewheel-bg) left top / 3.13rem 2.31rem no-repeat; }
 .ewheel__panel.has-sprite::before { content: none; }
 .ewheel__viewport { position: absolute; left: .205rem; top: .19rem; width: 2.71rem; height: 1.78rem; overflow: hidden; touch-action: pan-y; cursor: grab; }
 .ewheel__viewport:active { cursor: grabbing; }
@@ -150,7 +153,10 @@
 }
 
 /* ---- fork 二.5: the two emote switches in the panel ---------------------------------------------- */
-.ewheel__opts { display: flex; gap: .06rem; padding: .04rem .06rem .06rem; }
+/* 二.5 的两个开关：面板里其余子元素全是绝对定位，所以这一行原来落在普通流里、压在表情格子上（用户看到的坏排版）。
+   现在给它自己的一条带子，钉在底板正下方的空位里，两个开关各占一半宽度。 */
+.ewheel__opts { position: absolute; left: .15rem; top: 2.14rem; width: 2.82rem; height: .3rem; display: flex; gap: .06rem; padding: 0; }
+.ewheel__opts .ewheel__opt { flex: 1 1 0; min-width: 0; height: .3rem; padding: 0 .04rem; font-size: .13rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ewheel__opt {
   flex: 1; height: .26rem; padding: 0 .06rem; font-size: .13rem; letter-spacing: .06em;
   color: var(--text-md); background: rgba(8, 11, 10, .78); border: 1px solid var(--line-2); cursor: pointer;
