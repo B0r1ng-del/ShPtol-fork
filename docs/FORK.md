@@ -115,6 +115,26 @@ exists. The fork's per-mode rules land on top of it one change at a time, each o
   schedule onto the fork modeId in `data/choices.json`; `tools/fork-data.mjs` and `tools/build-data.mjs` apply it like
   the config layer, and `test/fork-data.test.js` guards it with the same idempotence check.
 
+## Fork features OUTSIDE 终极模拟
+
+A fork change that is not mode-specific does not belong in `tools/fork-overrides.mjs` — it lands in ordinary code, but it
+must still leave the official behaviour alone when it is switched off.
+
+- **二.5 表情：一键十连 + 弹幕** (EVERY mode; both switches are per-device preferences in `public/js/ui/emotes.js`,
+  `PREF_TEN_PULL` / `PREF_BARRAGE`, stored through `loadPref`/`savePref`):
+  - **一键十连** — with the switch on, ONE tap in the 交流 panel sends the same emote ten times. It is one message,
+    `g.emoteBurst { id }` (`shared/protocol.js`), which `Match.emoteBurst` broadcasts as `EMOTE_BURST_COUNT` (10) plain
+    `m.emote` frames — so every client renders it exactly like ten ordinary sends — and it is charged the ONE
+    single-send cooldown (`EMOTE_COOLDOWN_MS`), so ten quick taps can never flood a room. With the switch off the client
+    sends `g.emote` and nothing changes for anyone.
+  - **弹幕** — a purely local DISPLAY switch: `EmoteBarrage` (`public/js/ui/emotes.js`, styles `.ebarrage` in
+    `public/css/emotes.css`) flies the recent `store.emotes` across the screen right→left, one lane per item, while
+    `public/js/ui/teamPanel.js` stops drawing the avatar bubbles. It changes nothing that is sent, and a
+    `prefers-reduced-motion` block lays the items out statically instead of animating them.
+  - `test/fork-emote-burst.test.js` covers the server half (ten frames, one cooldown shared with `g.emote`, unknown id
+    refused without sending or charging the cooldown, works in 终极模拟 and in a solo room alike); the two pref helpers
+    and the intent wiring are covered in `test/client-static.test.js`.
+
 ## Fork change log
 
 | Change | What it does | Where |
@@ -124,3 +144,4 @@ exists. The fork's per-mode rules land on top of it one change at a time, each o
 | 二.2 商店升级槽位 | one 干员槽 per operator level (3→7) and a second 道具槽 at level 6 | `tools/fork-overrides.mjs` (`shopSlots`), `test/fork-ultimate-shop.test.js` |
 | 二.3 敌人属性调整 | R4 on: ordinary +10 % HP; leader +20 % HP/+20 % DEF/+8 % ATK; hidden core +35 % HP/+35 % DEF/+16 % ATK — HP per boss id | `tools/fork-overrides.mjs` (`enemyAdjust`), `server/match/gamedata.js` (`enemyExtras`/`bossHpExtra`), `server/match/waves.js`, `server/match/finalAssault.js`, `test/fork-ultimate-enemy-stats.test.js` |
 | 二.4 机变去时限 + 投票 | untimed, parallel draft with a 随机分配 vote (half the alive players resolves it randomly, one card each; 悬赏 never drawn and never voted on) + the AC-4 机变 schedule for the fork mode | `tools/fork-overrides.mjs` (`spDraft`, `applyForkChoices`), `server/match/Match.js` (SP_DRAFT), `server/match/gamedata.js` (`spDraftRules`), `shared/protocol.js` (`g.choiceRandom`), `server/match/audit.js`, `public/js/ui/choiceOverlay.js`, `public/js/ui/gameLogic.js`, `public/js/ui/gameActions.js`, `public/js/screens/game.js`, `test/fork-ultimate-sp-vote.test.js` |
+| 二.5 表情十连 + 弹幕 | EVERY mode: a 一键十连 switch (one tap → `g.emoteBurst` → ten `m.emote` frames on one cooldown) and a local 弹幕 display switch | `shared/constants.js` (`EMOTE_BURST_COUNT`/`EMOTE_BARRAGE_MS`), `shared/protocol.js`, `server/match/Match.js` (`emoteBurst`), `public/js/ui/emotes.js`, `public/js/ui/teamPanel.js`, `public/js/ui/gameActions.js`, `public/js/screens/game.js`, `public/css/emotes.css`, `test/fork-emote-burst.test.js` |

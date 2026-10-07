@@ -148,3 +148,30 @@
   .ewheel__panel, .ewheel__page, .ewheel__page.is-from-right, .ewheel__page.is-from-left { animation: none; }
   .ebubble { animation: emo-bubble-out 1ms linear calc(var(--ebubble-ttl) - 1ms - var(--ebubble-age)) forwards; }
 }
+
+/* ---- fork 二.5: the two emote switches in the panel ---------------------------------------------- */
+.ewheel__opts { display: flex; gap: .06rem; padding: .04rem .06rem .06rem; }
+.ewheel__opt {
+  flex: 1; height: .26rem; padding: 0 .06rem; font-size: .13rem; letter-spacing: .06em;
+  color: var(--text-md); background: rgba(8, 11, 10, .78); border: 1px solid var(--line-2); cursor: pointer;
+}
+.ewheel__opt:hover { color: var(--text-hi); border-color: var(--line-3); }
+.ewheel__opt.is-on { color: var(--text-on-mint); background: var(--mint-500); border-color: var(--mint-400); font-weight: 700; }
+
+/* ---- fork 二.5: the 弹幕 layer ------------------------------------------------------------------- */
+.ebarrage { position: absolute; inset: 0; z-index: 40; overflow: hidden; pointer-events: none; }
+.ebarrage__item {
+  position: absolute; top: calc(6% + var(--eb-lane, 0) * 9%);
+  left: 100%; width: .56rem; height: .56rem; display: grid; place-items: center;
+  filter: drop-shadow(0 .03rem .08rem rgba(0, 0, 0, .8));
+  animation: emo-barrage var(--eb-ms, 9s) linear forwards;
+}
+.ebarrage__item.is-mine { filter: drop-shadow(0 0 .1rem rgba(23, 249, 183, .75)); }
+.ebarrage__item img { width: 100%; height: 100%; object-fit: contain; }
+@keyframes emo-barrage { from { transform: translateX(0); } to { transform: translateX(calc(-100vw - .56rem)); } }
+
+@media (prefers-reduced-motion: reduce) {
+  /* the barrage is pure motion: with motion reduced, show the recent ones statically instead of disabling the feature */
+  .ebarrage { display: flex; gap: .06rem; align-items: flex-start; justify-content: flex-end; padding: .1rem; }
+  .ebarrage__item { position: static; left: auto; animation: none; opacity: .85; }
+}

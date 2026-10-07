@@ -20,7 +20,7 @@
 // Styles: public/css/emotes.css (injected on first use when the page does not link it).
 
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
-import { EMOTE_THEMES, EMOTE_COOLDOWN_MS, EMOTE_BUBBLE_MS, emoteInfo, emoteArtGroup } from '../../../shared/constants.js';
+import { EMOTE_THEMES, EMOTE_COOLDOWN_MS, EMOTE_BUBBLE_MS, EMOTE_BURST_COUNT, EMOTE_BARRAGE_MS, emoteInfo, emoteArtGroup } from '../../../shared/constants.js';
 import { html } from './components.js';
 import { GIcon } from './gameComponents.js';
 import { data, useData, localAsset, artUrls, nextArtUrl } from '../data.js';
@@ -30,6 +30,15 @@ const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
 export const EMOTE_CSS_HREF = '/css/emotes.css';
 const PREF_THEME = 'emoteTheme';
+// the two fork switches (requirement 二.5, EVERY mode — they are per-device choices, so they live in the local prefs):
+//   一键十连 — one tap on an emote sends it ten times (`g.emoteBurst`);
+//   弹幕     — emotes fly across the screen as a horizontally scrolling barrage instead of the avatar bubbles.
+export const PREF_TEN_PULL = 'emoteTenPull';
+export const PREF_BARRAGE = 'emoteBarrage';
+/** 一键十连 on? (per device; the server's `g.emoteBurst` is what actually sends the ten) */
+export const tenPullOn = () => loadPref(PREF_TEN_PULL, false) === true;
+/** 弹幕 on? (per device, display only) */
+export const barrageOn = () => loadPref(PREF_BARRAGE, false) === true;
 const SWIPE_PX = 40;      // horizontal drag distance that turns the page
 const DRAG_SLOP_PX = 8;   // below this a press is a tap, not a drag
 export const WHEEL_STEP_PX = 60;  // wheel / trackpad scroll that turns the page
@@ -202,8 +211,29 @@ export function EmoteBubble({ id, class: cls, ttl = EMOTE_BUBBLE_MS, at }) {
 }
 
 /**
+ * 弹幕 layer (fork, requirement 二.5 "让表情变成横向滚动的弹幕", every mode): the recent `m.emote` events fly across the
+ * screen right→left instead of (or as well as) the avatar bubbles. Pure display — it changes nothing that is sent, and
+ * one lane per item keeps a 一键十连 from stacking ten icons on top of each other.
+ * @param {{ emotes?: any[], myId?: string|null, lanes?: number }} props `emotes` = store.emotes ({ seq, playerId, id })
+ */
+export function EmoteBarrage({ emotes = [], myId = null, lanes = 4 }) {
+  useData('local');
+  const rows = (Array.isArray(emotes) ? emotes : []).slice(-24);
+  if (!rows.length) return null;
+  return html`<div class="ebarrage" aria-hidden="true">
+    ${rows.map((e, i) => {
+      const mine = !!myId && e.playerId === myId;
+      return html`<span key=${e.seq} class=${cx('ebarrage__item', mine && 'is-mine')}
+        style=${`--eb-lane:${i % Math.max(1, lanes)}; --eb-ms:${EMOTE_BARRAGE_MS}ms; animation-delay:${Math.min(i, 9) * 90}ms`}>
+        <${EmoteArt} id=${e.id} />
+      </span>`;
+    })}
+  </div>`;
+}
+
+/**
  * 交流 button + emote panel.
- * @param {{ onSend: (id:string)=>void, open: boolean, onToggle: (open:boolean)=>void, disabled?: boolean,
+ * @param {{ onSend: (id:string, o?:{burst?:boolean})=>void, open: boolean, onToggle: (open:boolean)=>void, disabled?: boolean,
  *   cooldownMs?: number }} props
  */
 export function EmoteWheel({ onSend, open, onToggle, disabled = false, cooldownMs = EMOTE_COOLDOWN_MS }) {
@@ -213,6 +243,9 @@ export function EmoteWheel({ onSend, open, onToggle, disabled = false, cooldownM
   const [dir, setDir] = useState(0);          // direction of the last page change (slide-in animation)
   const [dx, setDx] = useState(0);            // live drag offset (px)
   const [cooling, setCooling] = useState(() => cooldownLeft(lastSentAt, Date.now(), cooldownMs) > 0);
+  // the two fork switches (二.5), restored from the local prefs
+  const [ten, setTen] = useState(tenPullOn);
+  const [barrage, setBarrage] = useState(barrageOn);
   const drag = useRef(null);                  // { id, x0, moved }
   const swallowClick = useRef(false);
   const wheelAcc = useRef({ x: 0, t: -Infinity, spent: false });
@@ -263,7 +296,9 @@ export function EmoteWheel({ onSend, open, onToggle, disabled = false, cooldownM
     lastSentAt = now;
     rememberTheme(e.themeId);
     setCooling(true);
-    onSend(id);
+    // 一键十连 (二.5): with the switch on, ONE tap sends the emote ten times (`g.emoteBurst` — the server broadcasts it
+    // `EMOTE_BURST_COUNT` times, on this one cooldown)
+    onSend(id, { burst: ten });
     onToggle(false);
   };
 
@@ -328,6 +363,14 @@ export function EmoteWheel({ onSend, open, onToggle, disabled = false, cooldownM
       <div class="ewheel__dots" role="tablist" aria-label="表情主题">
         ${EMOTE_THEMES.map((t, i) => html`<button key=${t.themeId} type="button" role="tab" class=${cx('ewheel__dot', i === page && 'is-on')}
           aria-selected=${i === page ? 'true' : 'false'} aria-label=${`${t.name} ${i + 1}/${EMOTE_THEMES.length}`} onClick=${() => go(i)}></button>`)}
+      </div>
+      <div class="ewheel__opts">
+        <button type="button" class=${cx('ewheel__opt', ten && 'is-on')} aria-pressed=${ten ? 'true' : 'false'} data-testid="emote-ten"
+          title=${`一键十连：开启后点一次表情会连发 ${EMOTE_BURST_COUNT} 条`}
+          onClick=${() => setTen((v) => { const n = !v; savePref(PREF_TEN_PULL, n); return n; })}>一键十连</button>
+        <button type="button" class=${cx('ewheel__opt', barrage && 'is-on')} aria-pressed=${barrage ? 'true' : 'false'} data-testid="emote-barrage"
+          title="弹幕：表情改为横向滚动显示（只影响自己的画面）"
+          onClick=${() => setBarrage((v) => { const n = !v; savePref(PREF_BARRAGE, n); return n; })}>弹幕</button>
       </div>
     </div>` : null}
   </div>`;

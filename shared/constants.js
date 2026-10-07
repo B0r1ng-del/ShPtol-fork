@@ -249,3 +249,10 @@ export const emoteArtGroup = (id) => { const e = emoteInfo(id); return e ? `emot
 export const emoteArtPath = (id) => { const e = emoteInfo(id); return e ? `/assets/local/emoticon/${e.dir}/${e.picId}.png` : null; };
 export const EMOTE_COOLDOWN_MS = 1000; // activity_table autoChessData.constData.chatCD (s)
 export const EMOTE_BUBBLE_MS = 3000;   // constData.chatTime (s): how long a bubble stays up
+/**
+ * 一键十连 (fork, requirement 二.5): the emotes ONE `g.emoteBurst` sends. The burst shares the single-send cooldown — it
+ * is one send, not ten — so ten quick taps can never flood a room.
+ */
+export const EMOTE_BURST_COUNT = 10;
+/** How long one 弹幕 item takes to cross the screen (a client-side display choice, requirement 二.5). */
+export const EMOTE_BARRAGE_MS = 9000;

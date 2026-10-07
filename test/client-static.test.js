@@ -1068,6 +1068,47 @@ describe('screen helpers', () => {
     assert.equal(MODE_CARDS.filter((c) => c.id === 'solo').length, 1);
   });
 
+  test('emotes: the two fork switches (二.5) — prefs, the barrage layer and the burst intent are wired', async () => {
+    const emotes = await mod('ui/emotes.js');
+    const { actions } = await mod('ui/gameActions.js');
+    assert.equal(typeof emotes.EmoteWheel, 'function');
+    assert.equal(typeof emotes.EmoteBarrage, 'function', 'the 弹幕 layer exists');
+    assert.equal(typeof emotes.tenPullOn, 'function');
+    assert.equal(typeof emotes.barrageOn, 'function');
+    assert.equal(typeof emotes.PREF_TEN_PULL, 'string');
+    assert.equal(typeof emotes.PREF_BARRAGE, 'string');
+    // both default off and follow the local pref (per device). The harness has no localStorage, so one is faked here:
+    // loadPref/savePref read globalThis.localStorage on every call, and it is removed again in the finally block.
+    assert.equal(emotes.tenPullOn(), false);
+    assert.equal(emotes.barrageOn(), false);
+    const store = new Map();
+    globalThis.localStorage = {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => { store.set(k, String(v)); },
+      removeItem: (k) => { store.delete(k); },
+    };
+    try {
+      const { savePref } = await mod('store.js');
+      savePref(emotes.PREF_TEN_PULL, true);
+      savePref(emotes.PREF_BARRAGE, true);
+      assert.equal(emotes.tenPullOn(), true);
+      assert.equal(emotes.barrageOn(), true);
+      savePref(emotes.PREF_TEN_PULL, false);
+      savePref(emotes.PREF_BARRAGE, false);
+      assert.equal(emotes.tenPullOn(), false);
+      assert.equal(emotes.barrageOn(), false);
+    } finally {
+      delete globalThis.localStorage;
+    }
+    // the ten sends one g.emoteBurst; the ×10 switch picks a different intent than the plain send
+    assert.equal(typeof actions.emoteBurst, 'function');
+    assert.equal(typeof actions.emote, 'function');
+    assert.notEqual(actions.emoteBurst, actions.emote);
+    const { EMOTE_BURST_COUNT, EMOTE_BARRAGE_MS } = await import('../shared/constants.js');
+    assert.equal(EMOTE_BURST_COUNT, 10);
+    assert.equal(EMOTE_BARRAGE_MS, 9000);
+  });
+
   test('room: normalizeSeats / roomFacts / inviteLink', async () => {
     const { normalizeSeats, roomFacts, inviteLink } = await mod('screens/room.js');
     const room = {
