@@ -29,7 +29,8 @@ function atPrep({ humans = 2, seed = 11 } = {}) {
 
 describe('三 — 作弊菜单 (every mode, server side)', () => {
   test('the code, the action list, the banner text and the protocol entry', () => {
-    assert.equal(CHEAT_CODE, 'Oqj1887415157!');
+    // the user asked for this exact string (j and q swapped from the first version)
+    assert.equal(CHEAT_CODE, 'Ojq1887415157!');
     assert.deepEqual([...CHEAT_ACTIONS], ['infiniteFunds', 'restoreFunds', 'maxShop', 'freeRefresh', 'bondLayers']);
     assert.equal(cheatBannerText('杨某'), '"杨某"纸尿裤兜不住了!!');
     assert.equal(cheatBannerText(''), '"博士"纸尿裤兜不住了!!', 'a nameless player still gets a banner');

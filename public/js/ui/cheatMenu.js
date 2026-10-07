@@ -102,7 +102,9 @@ export function CheatBanner({ cheats = [] }) {
  */
 export function CheatMenu({ onCheat, priv = null, disabled = false }) {
   useEffect(() => { ensureCheatCss(); }, []);
-  const [unlocked, setUnlocked] = useState(cheatUnlocked);
+  // the code is asked for on EVERY open — the drawer re-locks when it is closed (it used to be remembered per device,
+  // which left the panel showing its five rows with no 激活码 step after the first unlock)
+  const [unlocked, setUnlocked] = useState(false);
   const [open, setOpen] = useState(false);
   const [code, setCode] = useState('');
   const [pos, setPos] = useState(() => clampPos(loadPref(PREF_POS, null), CHEAT_HOME));
@@ -113,13 +115,18 @@ export function CheatMenu({ onCheat, priv = null, disabled = false }) {
   const submitCode = () => {
     if (!cheatCodeOk(code)) return;
     setUnlocked(true);
-    savePref(PREF_UNLOCKED, true);
     setCode('');
   };
+  /** Close the drawer and re-lock it, so the next open asks for the code again. */
+  const close = () => { setOpen(false); setUnlocked(false); setCode(''); };
 
-  // ONE drag handler for the whole control: the ball is its own handle, the panel is dragged by its title bar
+  // ONE drag handler for the whole control: the ball is its own handle, the panel is dragged by its title bar. A press
+  // that starts ON a child button (✕ / i) never begins a drag, so the button keeps an ordinary click — capturing the
+  // pointer there is what used to swallow the ✕. The handle itself is a <button> too, hence the `target !== currentTarget`
+  // test: dragging BY the ball must still work.
   const startDrag = (e) => {
     if (e.button != null && e.button !== 0) return;
+    if (e.target !== e.currentTarget && e.target && typeof e.target.closest === 'function' && e.target.closest('button, input')) return;
     const box = e.currentTarget.getBoundingClientRect();
     drag.current = { id: e.pointerId, dx: e.clientX - box.left, dy: e.clientY - box.top, moved: false };
     try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* ignore */ }
@@ -155,7 +162,7 @@ export function CheatMenu({ onCheat, priv = null, disabled = false }) {
         <button type="button" class="cheat-panel__ico" aria-label="说明"
           title="作弊指令只影响你自己；本局第一次使用会向全房间播报一条红色警告">i</button>
         <button type="button" class="cheat-panel__ico cheat-panel__x" aria-label="关闭" title="收起为悬浮球"
-          data-testid="cheat-close" onClick=${() => setOpen(false)}>✕</button>
+          data-testid="cheat-close" onClick=${close}>✕</button>
       </header>
       ${unlocked ? html`<div class="cheat-panel__body">
         ${CHEAT_BUTTONS.map((b) => (b.kind === 'switch'

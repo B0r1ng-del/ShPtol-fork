@@ -263,7 +263,7 @@ export const EMOTE_BARRAGE_MS = 9000;
 // ACTION, and — per the owner's call "谁开谁负责" — every cheat touches the activating player's own state only (a
 // shared 干员池 can still be drained by one cheater, and the room is told about it: see CHEAT_BANNER below).
 /** The activation code typed in the client's 作弊菜单 panel (client-side gate only). */
-export const CHEAT_CODE = 'Oqj1887415157!';
+export const CHEAT_CODE = 'Ojq1887415157!';
 /** Every action `g.cheat` accepts, in the panel's order. */
 export const CHEAT_ACTIONS = Object.freeze(['infiniteFunds', 'restoreFunds', 'maxShop', 'freeRefresh', 'bondLayers']);
 /** 无限资金: the funds a pinned player shows while the switch is on (every price in the game is far below it). */
