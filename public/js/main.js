@@ -229,6 +229,10 @@ function wireNet() {
   net.on('m.emote', (msg) => {
     store.set((s) => ({ emotes: [...s.emotes.slice(-(EMOTE_KEEP - 1)), { seq: ++seq, playerId: msg.playerId, id: msg.id, at: Date.now() }] }));
   });
+  // 作弊菜单 (fork 三): the red warning banner the room gets the first time a player uses a cheat
+  net.on('m.cheat', (msg) => {
+    store.set((s) => ({ cheats: [...s.cheats.slice(-3), { seq: ++seq, playerId: msg.playerId, name: msg.name, text: msg.text, at: Date.now() }] }));
+  });
 
   // Entering (title → lobby) while already online also needs the deep-link join.
   store.subscribe((s, prev) => {

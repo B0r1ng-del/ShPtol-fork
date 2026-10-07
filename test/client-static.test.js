@@ -1109,6 +1109,41 @@ describe('screen helpers', () => {
     assert.equal(EMOTE_BARRAGE_MS, 9000);
   });
 
+  test('cheat menu: the activation code, the five entries, the drag clamp and the banner source (三)', async () => {
+    const cheat = await mod('ui/cheatMenu.js');
+    const { actions } = await mod('ui/gameActions.js');
+    const consts = await import('../shared/constants.js');
+    assert.equal(typeof cheat.CheatMenu, 'function');
+    assert.equal(typeof cheat.CheatBanner, 'function');
+    assert.equal(typeof cheat.ensureCheatCss, 'function');
+    assert.equal(cheat.CHEAT_CSS_HREF, '/css/cheat.css');
+    // the activation code is an exact match against the shared constant (a client-side gate only)
+    assert.equal(cheat.cheatCodeOk(consts.CHEAT_CODE), true);
+    assert.equal(cheat.cheatCodeOk(` ${consts.CHEAT_CODE} `), true, 'surrounding blanks are tolerated');
+    assert.equal(cheat.cheatCodeOk(consts.CHEAT_CODE.toUpperCase()), false);
+    assert.equal(cheat.cheatCodeOk(''), false);
+    assert.equal(cheat.cheatCodeOk(null), false);
+    assert.equal(cheat.cheatCodeOk(undefined), false);
+    // the panel's five entries are exactly the requirement's five, in order
+    assert.deepEqual(cheat.CHEAT_BUTTONS.map((b) => b.action), [...consts.CHEAT_ACTIONS]);
+    assert.deepEqual(cheat.CHEAT_BUTTONS.map((b) => b.label), ['无限资金', '复原资金', '商店满级', '免费刷新 +5', '盟约层数 +100']);
+    assert.equal(cheat.CHEAT_BUTTONS.filter((b) => b.kind === 'switch').length, 1, '无限资金 is the only switch');
+    // the remembered positions are clamped into the viewport, garbage falls back
+    assert.deepEqual(cheat.clampPos(null, { x: 0.9, y: 0.1 }), { x: 0.9, y: 0.1 });
+    assert.deepEqual(cheat.clampPos({ x: -5, y: 42 }, { x: 0.9, y: 0.1 }), { x: 0.02, y: 0.98 });
+    assert.deepEqual(cheat.clampPos({ x: 'x', y: NaN }, { x: 0.9, y: 0.1 }), { x: 0.9, y: 0.1 });
+    assert.deepEqual(cheat.clampPos({ x: 0.5, y: 0.5 }, { x: 0, y: 0 }), { x: 0.5, y: 0.5 });
+    // the intent, and the banner's own text rule
+    assert.equal(typeof actions.cheat, 'function');
+    assert.equal(consts.cheatBannerText('A'), '"A"纸尿裤兜不住了!!');
+    assert.equal(cheat.CHEAT_BANNER_MS > 0, true);
+    // the store carries the banner list main.js fills from m.cheat
+    const storeSrc = readFileSync(path.join(ROOT, 'public/js/store.js'), 'utf8');
+    assert.match(storeSrc, /cheats: \[\],/, 'store.cheats exists');
+    const mainSrc = readFileSync(path.join(ROOT, 'public/js/main.js'), 'utf8');
+    assert.match(mainSrc, /net\.on\('m\.cheat'/, 'main.js listens for m.cheat');
+  });
+
   test('room: normalizeSeats / roomFacts / inviteLink', async () => {
     const { normalizeSeats, roomFacts, inviteLink } = await mod('screens/room.js');
     const room = {

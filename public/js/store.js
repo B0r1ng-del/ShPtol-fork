@@ -81,6 +81,8 @@ export const initialState = Object.freeze({
   match: emptyMatch(),
   ticker: [],
   emotes: [],
+  // 作弊菜单 (fork 三): the `m.cheat` warning banners this client has seen (ui/cheatMenu.js CheatBanner)
+  cheats: [],
   clock: { offset: 0, rtt: null, synced: false },
   ui: { pendingJoin: null, restoring: false, buildStale: false },
 });

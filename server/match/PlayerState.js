@@ -70,7 +70,7 @@
 //     it during INFO_CHECK only. battleInput() resolves every chess unit to `skillIndex` + `moduleId` (resolveLoadout:
 //     normal chess → moduleId null, elite → uniEquipId | 'none'); m.private exposes `loadout`.
 
-import { ERR, GEO, PHASE, layerGainRoom } from '../../shared/constants.js';
+import { ERR, GEO, PHASE, layerGainRoom, CHEAT_INFINITE_FUNDS, CHEAT_FREE_REFRESHES, CHEAT_BOND_LAYERS } from '../../shared/constants.js';
 import { checkLoadout, resolveLoadout } from '../../shared/protocol.js';
 import { FIELD, tileKey, parseKey, inField, canPlace, placeClass, boardOrder, freeSlot, pieceDir, parseDir, mergeTile, ownerRangeKeys } from './board.js';
 import { attackRangeGrid, loadoutRecord, resolveRecordLoadout } from '../../shared/loadoutRecord.js';
@@ -113,6 +113,12 @@ export class PlayerState {
     this.loadout = Object.freeze({});
     if (!this.isBot && seat.loadout) this.setLoadout(seat.loadout);
     this.shop = { level: 1, upgradePrice: this.gd.upgradeBase(1) ?? 0, slots: [], frozen: false, freeRefreshes: 0 };
+    /**
+     * 作弊菜单 state (fork 三): `infiniteFunds` = the 无限资金 switch, `fundsBaseline` = the funds captured when it was
+     * switched on (复原资金 restores it), `used` = "this player has used a cheat in this match" (Match.cheat raises the
+     * red banner once). Everything here only ever touches THIS player.
+     */
+    this.cheat = { infiniteFunds: false, fundsBaseline: null, used: false };
     /** reward offers queue (merge rewards, special refreshes): { tier, source, label, slots: [{ kind, id, price, sold }] } */
     this.offers = [];
     /** @type {Array<any>} */
@@ -791,14 +797,82 @@ export class PlayerState {
     return this.funds - before;
   }
 
+  /** Whether `price` can be paid (作弊菜单 无限资金 makes everything payable). */
+  _payable(price) { return this.cheat.infiniteFunds || this.funds >= price; }
+
   spend(n) {
     const v = Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0;
-    if (v > this.funds) return false;
-    this.funds -= v;
+    // 无限资金 (fork 三): the price is still counted (stats/round/titles stay consistent), only the funds are not taken
+    if (!this.cheat.infiniteFunds) {
+      if (v > this.funds) return false;
+      this.funds -= v;
+    }
     this.stats.gold += v;
     this.round.spent += v;
     this.dirty();
     return true;
+  }
+
+  /**
+   * 作弊菜单 (fork 三, requirement 三.3) — one of CHEAT_ACTIONS, applied to THIS player only (the owner's call
+   * "谁开谁负责"). Returns `{ ok: true }` or a fail(...). `on` is 无限资金's new value (absent ⇒ toggle).
+   *   infiniteFunds — pin the funds: `spend()` stops taking them and `_payable()` accepts any price; the funds shown
+   *                   are topped up to CHEAT_INFINITE_FUNDS so the panel does not read as broken; the pre-switch value
+   *                   is captured for 复原资金.
+   *   restoreFunds  — put the captured baseline back and switch 无限资金 off.
+   *   maxShop       — 调度中心 to the mode's max level (free) and reroll.
+   *   freeRefresh   — +CHEAT_FREE_REFRESHES free refreshes.
+   *   bondLayers    — +CHEAT_BOND_LAYERS layers on every ACTIVE bond, through addLayers (so BOND_LAYER_CAP 999 holds).
+   */
+  applyCheat(action, on = null) {
+    // an eliminated player has no shop / offers / bounties any more (invariants.js: "eliminated but keeps shop/…"), so
+    // the whole panel is refused rather than letting a cheat re-populate them — like every other intent (_gate)
+    if (!this.alive) return fail(ERR.ELIMINATED);
+    switch (action) {
+      case 'infiniteFunds': {
+        const next = on == null ? !this.cheat.infiniteFunds : on === true;
+        if (next === this.cheat.infiniteFunds) return OK;
+        if (next) {
+          this.cheat.fundsBaseline = this.funds;
+          this.cheat.infiniteFunds = true;
+          this.funds = Math.max(this.funds, CHEAT_INFINITE_FUNDS);
+        } else {
+          this.cheat.infiniteFunds = false;
+          if (this.cheat.fundsBaseline != null) this.funds = this.cheat.fundsBaseline;
+          this.cheat.fundsBaseline = null;
+        }
+        this.dirty();
+        return OK;
+      }
+      case 'restoreFunds': {
+        if (this.cheat.fundsBaseline != null) this.funds = this.cheat.fundsBaseline;
+        else this.funds = 0;
+        this.cheat.fundsBaseline = null;
+        this.cheat.infiniteFunds = false;
+        this.dirty();
+        return OK;
+      }
+      case 'maxShop': {
+        this.shop.level = this.gd.maxShopLevel;
+        this.shop.upgradePrice = this.gd.upgradeBase(this.shop.level) ?? 0;
+        this.rollShop({ keepFrozen: true });
+        this.m.tickerFor('SHOP_LEVEL', [this.name, String(this.shop.level)], { playerId: this.playerId, param: String(this.shop.level) });
+        this.dirty();
+        return OK;
+      }
+      case 'freeRefresh': {
+        this.shop.freeRefreshes += CHEAT_FREE_REFRESHES;
+        this.dirty();
+        return OK;
+      }
+      case 'bondLayers': {
+        const active = Object.keys(this.bonds || {}).filter((id) => this.bonds[id] && this.bonds[id].active && this.gd.bond(id));
+        if (!active.length) return fail(ERR.BAD_TARGET, 'no active bond to raise');
+        for (const id of active) this.addLayers(id, CHEAT_BOND_LAYERS, { reason: 'cheat' });
+        return OK;
+      }
+      default: return fail(ERR.BAD_MSG, 'unknown cheat action');
+    }
   }
 
   /** onSpend, dispatched once a payment's action is complete (buy / refresh / levelUp / reward / effect). */
@@ -892,7 +966,7 @@ export class PlayerState {
     if (!slot) return fail(ERR.BAD_TARGET);
     if (slot.sold) return fail(ERR.SOLD_OUT);
     const price = this.priceOf(slot);
-    if (this.funds < price) return fail(ERR.NO_FUNDS);
+    if (!this._payable(price)) return fail(ERR.NO_FUNDS);
     const handFull = freeSlot(this.hand) < 0;
     let piece;
     if (slot.kind === 'chess') {
@@ -924,7 +998,7 @@ export class PlayerState {
     const g = this._gate(); if (g) return g;
     const free = this.shop.freeRefreshes > 0;
     const price = free ? 0 : this.gd.refreshPrice;
-    if (!free && this.funds < price) return fail(ERR.NO_FUNDS);
+    if (!free && !this._payable(price)) return fail(ERR.NO_FUNDS);
     if (free) this.shop.freeRefreshes--;
     else this.spend(price);
     this.rollShop({ keepFrozen: false });
@@ -948,7 +1022,7 @@ export class PlayerState {
     const g = this._gate(); if (g) return g;
     if (this.shop.level >= this.gd.maxShopLevel) return fail(ERR.MAX_LEVEL);
     const price = Math.max(0, this.shop.upgradePrice);
-    if (this.funds < price) return fail(ERR.NO_FUNDS);
+    if (!this._payable(price)) return fail(ERR.NO_FUNDS);
     this.spend(price);
     this.shop.level++;
     this.shop.upgradePrice = this.gd.upgradeBase(this.shop.level) ?? 0;
@@ -1409,7 +1483,7 @@ export class PlayerState {
       if (handFull && !this.completesChessMerge(slot.id)) return fail(ERR.HAND_FULL);
     }
     const price = Number.isFinite(slot.price) && slot.price > 0 ? Math.trunc(slot.price) : 0;
-    if (price > this.funds) return fail(ERR.NO_FUNDS);
+    if (!this._payable(price)) return fail(ERR.NO_FUNDS);
     slot.sold = true;
     this.offers.shift();
     if (price > 0) this.spend(price);
@@ -1492,7 +1566,7 @@ export class PlayerState {
     for (const uid of [...this._tempDue.keys()]) if (!this.temp.some((p) => p && p.uid === uid)) this._tempDue.delete(uid);
     this.offers = [];
     this.clearUnfrozenShop();
-    if (!this.gd.leftoverKeptBands.includes(this.bandId)) this.funds = 0;
+    if (!this.gd.leftoverKeptBands.includes(this.bandId)) this.funds = this.cheat.infiniteFunds ? CHEAT_INFINITE_FUNDS : 0;
     this.ready = true;
     this.dirty();
   }
@@ -1515,6 +1589,10 @@ export class PlayerState {
     this.offers = [];
     this.bounties = [];
     this.shop.slots = [];
+    // 作弊菜单 (fork 三): elimination drops the whole cheat state with the shop/offers reset — an eliminated player has
+    // no funds (invariants.js "eliminated with funds …") and the panel is refused from here on
+    this.cheat.infiniteFunds = false;
+    this.cheat.fundsBaseline = null;
     this.funds = 0;
     this.pendingFunds = 0;
     this.recompute();
@@ -1651,6 +1729,8 @@ export class PlayerState {
         // `label` the bar shows instead; `queued` = offers waiting behind it (player report #6 after 0.1.0)
         rewardOffer: offer ? { tier: offer.tier, source: offer.source === 'merge' ? 'merge' : 'special', label: offer.label || null, queued: this.offers.length - 1, slots: offer.slots.map((s) => ({ kind: s.kind === 'item' ? 'item' : 'chess', id: s.id, price: s.price, sold: !!s.sold })) } : null,
       },
+      // 作弊菜单 (fork 三): the only bit the panel needs from the server — 无限资金 is server-authoritative
+      cheat: { infiniteFunds: !!this.cheat.infiniteFunds, used: !!this.cheat.used },
       hand: this.hand.map((p) => (p ? this.pieceView(p) : null)),
       temp: this.temp.map((p) => (p ? this.pieceView(p) : null)),
       board,
