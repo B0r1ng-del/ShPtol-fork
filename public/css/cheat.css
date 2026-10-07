@@ -90,7 +90,8 @@
 
 /* ---- 红色警告横幅: "「<name>」纸尿裤兜不住了!!" ---- */
 .cheat-banner {
-  position: absolute; left: 50%; top: .16rem; transform: translateX(-50%);
+  /* below the in-match top bar (回合 / 休息一下 / 倒计时 live in the top ~1rem), so it never covers the round info */
+  position: absolute; left: 50%; top: 1.05rem; transform: translateX(-50%);
   display: flex; align-items: center; gap: .1rem; max-width: 80vw;
   padding: .08rem .18rem; font-size: .2rem; font-weight: 900; letter-spacing: .06em; color: #fff5f4;
   background: linear-gradient(180deg, #d81b12, #8c0f09); border: 2px solid #ff7a6e;
