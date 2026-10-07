@@ -130,7 +130,7 @@
 //     human is left at all the match ends ('abandoned'); when nobody alive is left it ends as 'eliminated'.
 
 import { C2S, unitStatsEntry } from '../../shared/protocol.js';
-import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, GEO, ROOM_MODES, modeIdFor, layerGainRoom } from '../../shared/constants.js';
+import { PHASE, ERR, EMOTES, EMOTE_COOLDOWN_MS, EMOTE_BURST_COUNT, GEO, ROOM_MODES, modeIdFor, layerGainRoom } from '../../shared/constants.js';
 import { Battle } from '../sim/Battle.js';
 import { DataSource } from '../sim/simdata.js';
 import { createRng, deriveSeed } from '../sim/rng.js';
@@ -1103,6 +1103,7 @@ export class Match {
       case 'g.choiceRandom': return this.voteRandomChoice(ps);
       case 'g.ready': return ps.setReady(!!msg.ready);
       case 'g.emote': return this.emote(ps, msg.id);
+      case 'g.emoteBurst': return this.emoteBurst(ps, msg.id);
       case 'g.watch': return this.watch(ps, msg.fieldId);
       case 'g.autoplay': return this.setAutoplay(ps, !!msg.on);
       case 'g.pause': return this.setPause(ps, !!msg.on);
@@ -1121,6 +1122,20 @@ export class Match {
     if (now - ps.lastEmoteAt < EMOTE_COOLDOWN_MS) return fail(ERR.RATE);
     ps.lastEmoteAt = now;
     this.broadcast({ t: 'm.emote', playerId: ps.playerId, id });
+    return OK;
+  }
+
+  /**
+   * 一键十连 (fork 二.5, every mode): ONE send broadcasts the same emote `EMOTE_BURST_COUNT` times, so a single tap
+   * shows ten arrivals. It shares the single-send cooldown (one send, not ten — ten quick taps can never flood a room),
+   * and each frame is a plain `m.emote`, so every client renders it exactly like ten ordinary sends.
+   */
+  emoteBurst(ps, id) {
+    if (!EMOTES.includes(id)) return fail(ERR.BAD_MSG, 'unknown emote');
+    const now = this.sched.now();
+    if (now - ps.lastEmoteAt < EMOTE_COOLDOWN_MS) return fail(ERR.RATE);
+    ps.lastEmoteAt = now;
+    for (let i = 0; i < EMOTE_BURST_COUNT; i++) this.broadcast({ t: 'm.emote', playerId: ps.playerId, id });
     return OK;
   }
 
