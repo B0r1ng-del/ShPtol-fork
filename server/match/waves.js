@@ -234,6 +234,16 @@ export function scaleFor(gd, r) {
   return gd.enemyScale(r);
 }
 
+/** The spawn mods of a round's scale for a non-leader enemy: HP / ATK / speed, plus `supplyHpMul` when the round has one. */
+export function roundMods(scale, ex = null) {
+  const m = { hpMul: scale.hpMul, atkMul: scale.atkMul, speedMul: scale.speedMul };
+  if (scale.supplyHpMul != null) m.supplyHpMul = scale.supplyHpMul;
+  // the MODE's own spawn extras on top of the official table (fork 二.3; all 1 for every official mode). An ordinary
+  // spawn takes the +HP only: the leader / hidden core ATK+DEF extra is applied by the boss branch of templateSpawns.
+  if (ex) m.hpMul *= ex.normalHp;
+  return m;
+}
+
 /** Slot class of an enemy that has no placeholder slot (literal template keys, bounty adds). */
 export function classOf(gd, enemyKey) {
   const e = gd.enemy(enemyKey);
@@ -329,18 +339,14 @@ function templateSpawns(gd, tpl, round, pick) {
       interval: count > 1 ? step : 0,
       // the round multipliers are ENEMY effects on every enemy but 炎佑 (aceffect_enemy_1–5 `enemy_attribute_mul`,
       // enemy_exclude = enemy_9012_acloon): leader parts take them all; the leader takes ATK / speed but not HP — its HP
-      // is the server pool, "领袖单位于服务器的生命值加成不受上述加成影响" (PRTS 下半). The mode's own extras sit on top
-      // (ex.*): the ordinary +HP never reaches the leader (it has no hpMul here) nor a 部位 (`isPart`), while the
-      // leader's / hidden core's ATK and DEF do — `defMul` is only added when it is not 1, so an official spec is
-      // byte-identical to before.
+      // is the server pool, "领袖单位于服务器的生命值加成不受上述加成影响" (PRTS 下半). `supplyHpMul` (roundMods) rides along for
+      // the 器物 hit-count units, which 补给线 / 补给线II leave out (archetypes.js `times`; also a 频次 enemy's death spawn).
+      // The mode's own extras sit on top (ex.*, fork 二.3): the ordinary +HP never reaches the leader (it has no hpMul
+      // here) nor a 部位 (`isPart`), while the leader's / hidden core's ATK and DEF do — `defMul` is only added when it
+      // is not 1, so an official spec is byte-identical to before.
       mods: isBoss
-        ? {
-          atkMul: scale.atkMul * ex.bossAtk, speedMul: scale.speedMul, slot,
-          ...(ex.bossDef !== 1 ? { defMul: ex.bossDef } : null),
-        }
-        : {
-          hpMul: scale.hpMul * (isPart ? 1 : ex.normalHp), atkMul: scale.atkMul, speedMul: scale.speedMul, slot,
-        },
+        ? { atkMul: scale.atkMul * ex.bossAtk, speedMul: scale.speedMul, slot, ...(ex.bossDef !== 1 ? { defMul: ex.bossDef } : null) }
+        : { ...roundMods(scale, isPart ? null : ex), slot },
       actionIndex: i,
       preview: previewInfo(gd, key, routes[routeIndex], isBoss, leader),
     };
@@ -542,7 +548,7 @@ function bountyPlan(gd, round, wave, bounties, playerId, side) {
         routeIndex,
         count: run.len,
         interval: run.len > 1 ? step : 0,
-        mods: { hpMul: scale.hpMul * ex.normalHp, atkMul: scale.atkMul, speedMul: scale.speedMul, slot: classOf(gd, c.enemyKey), bountyId: b.id },
+        mods: { ...roundMods(scale, ex), slot: classOf(gd, c.enemyKey), bountyId: b.id },
         tag: 'bounty',
         ownerPlayerId: playerId,
         preview: previewInfo(gd, c.enemyKey, routes[routeIndex], false, leader),

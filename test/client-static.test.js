@@ -37,7 +37,7 @@ function walk(dir, ext, out = []) {
   return out;
 }
 
-/** URL path served by the server → file on disk (mirrors server/index.js mounts). */
+/** URL path served by the server → file on disk (mirrors the server/http/static.js mounts). */
 function urlPathToFile(urlPath) {
   const clean = decodeURIComponent(urlPath.split(/[?#]/)[0]);
   if (clean.startsWith('/shared/')) return path.join(ROOT, clean);
@@ -1061,10 +1061,13 @@ describe('screen helpers', () => {
     assert.equal(ult.name, '终极模拟');
     assert.equal(ult.en, 'ULTIMATE SIMULATION');
     assert.equal(ult.icon, 'crown');
-    assert.ok(ult.desc.includes('6'), 'the card states the six-博士 alliance');
-    assert.ok(ult.points.some((p) => p.includes(`1–${ULTIMATE_SEATS}`)), 'and its seat range');
+    // 0.2.0 i18n: both fork cards are TEMPLATES (`… {n} 名博士 …`) carrying `params` / `pointParams`, so the
+    // assertions resolve the placeholders instead of matching the literal text the fork once used.
+    const resolve = (s, params) => String(s).replace(/\{(\w+)\}/g, (m, k) => (params && k in params ? String(params[k]) : m));
+    assert.ok(resolve(ult.desc, ult.params).includes(String(ULTIMATE_SEATS)), 'the card states the six-博士 alliance');
+    assert.ok(ult.points.some((p) => resolve(p, ult.pointParams).includes(`1–${ULTIMATE_SEATS}`)), 'and its seat range');
     const coop = MODE_CARDS.find((c) => c.id === 'coop');
-    assert.ok(coop.points.some((p) => p.includes(`1–${MAX_SEATS}`)), 'co-op keeps 1–4 博士');
+    assert.ok(coop.points.some((p) => resolve(p, coop.pointParams).includes(`1–${MAX_SEATS}`)), 'co-op keeps 1–4 博士');
     assert.equal(MODE_CARDS.filter((c) => c.id === 'solo').length, 1);
   });
 

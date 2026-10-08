@@ -1,4 +1,5 @@
-// public/js/ui/cheatMenu.js — 作弊菜单 (fork, requirement 三: available in EVERY mode).
+// public/js/ui/cheatMenu.js — 作弊菜单 (fork, requirement 三: available in EVERY mode). i18n-ignore-file: this is a
+// debug panel behind a secret activation code, deliberately Chinese-only — its strings never enter the language packs.
 //
 //   * 触发与激活 — ONE floating control (图四): while locked it is a small ball; typing CHEAT_CODE in the panel it is
 //     attached to unlocks it. The activation code is a UI GATE, not a security boundary (it ships in this bundle) and

@@ -23,6 +23,8 @@ import { itemIconUrl, enemyIconUrl, uiUrl } from './assetUrls.js';
 import { richTextPlain } from './richText.js';
 import { sortedPlayers } from './gameLogic.js';
 import { data } from '../data.js';
+import { t, tName } from '../../../shared/i18n.js';
+import { sentText } from './lang.js';
 
 const cx = (...p) => p.flat().filter(Boolean).join(' ');
 
@@ -31,12 +33,14 @@ const bare = (t) => String(t || '').replace(/\s+/g, '');
 /**
  * A card's effect text: the card's own rich text, else the data's rich text (highlighted numbers, 下场作战, set bonuses,
  * line breaks — the detail card's text) while it says what the server's plain `desc` says, else that plain text (a
- * server-side wording the data does not have wins).
+ * server-side wording the data does not have wins). The server's texts are Chinese: `rawRich` is the record's Chinese
+ * rich text they are compared with, `rich` the same record in the current language (the two are one text in Chinese).
  * @param {{ descRaw?: string, desc?: string }} card @param {string} rich items.json / effects.json descRaw
+ * @param {string} [rawRich] its Chinese text (data.lookupRaw)
  */
-export function cardText(card, rich) {
-  if (card.descRaw) return card.descRaw;
-  if (rich && (!card.desc || bare(richTextPlain(rich)) === bare(card.desc))) return rich;
+export function cardText(card, rich, rawRich = rich) {
+  if (card.descRaw) return rich && card.descRaw === rawRich ? rich : card.descRaw;
+  if (rich && (!card.desc || bare(richTextPlain(rawRich || rich)) === bare(card.desc))) return rich;
   return card.desc || rich || '';
 }
 
@@ -52,6 +56,7 @@ export function resolveSpCard(card, family) {
   const eff = effectId ? data.lookup('effects', effectId) : null;
   const itemId = card.itemId || (!effectId && typeof card.id === 'string' && data.lookup('items', card.id) ? card.id : null);
   const item = itemId ? data.lookup('items', itemId) : null;
+  const rawRich = (itemId && data.lookupRaw('items', itemId)?.descRaw) || (effectId && data.lookupRaw('effects', effectId)?.descRaw) || '';
   const bounty = byEffect(choices?.cards?.bounty, effectId);
   const tactic = byEffect(choices?.cards?.tactic, effectId);
   const m = data.get('assets');
@@ -66,8 +71,8 @@ export function resolveSpCard(card, family) {
   else icon = uiUrl(m, `buffIcon/${team ? 'icon_team_buff' : 'icon_player_buff'}`);
   return {
     kind,
-    name: card.name || item?.name || eff?.name || bounty?.name || tactic?.name || '机变',
-    desc: cardText(card, item?.descRaw || eff?.descRaw || '') || item?.desc || eff?.desc || bounty?.desc || tactic?.desc || '',
+    name: tName(card.name) || item?.name || eff?.name || bounty?.name || tactic?.name || t('机变'),
+    desc: cardText(card, item?.descRaw || eff?.descRaw || '', rawRich) || item?.desc || eff?.desc || bounty?.desc || tactic?.desc || '',
     tier: Number.isFinite(card.tier) ? card.tier : item?.tier ?? bounty?.tier ?? null,
     icon,
     team: !!team,
@@ -168,14 +173,11 @@ export function ChoiceOverlay(props) {
 export function ChoiceView({ pub, sp, myId, solo, busyIdx = null, total = null, armed = null, onTap = () => {}, onConfirm = () => {}, onDisarm = () => {}, onRandom = null }) {
   if (!sp) return null;
   const fam = data.get('choices')?.families?.[sp.family] || null;
+  const rawFam = data.getRaw('choices')?.families?.[sp.family] || null;
   const players = new Map(sortedPlayers(pub).map((p) => [p.playerId, p]));
   const myTurn = solo || sp.parallel || sp.turnPid === myId;
   const mine = sp.pickOf.get(myId);
-  const turnName = players.get(sp.turnPid)?.name || '队友';
-  const canVote = !!onRandom && randomVoteAvailable(sp, { myId, solo });
-  const votes = (sp.randomVotes || []).length;
-  const aliveCount = (Array.isArray(pub?.players) ? pub.players : []).filter((p) => p && p.alive !== false).length;
-  const votesNeeded = Math.max(1, Math.ceil(aliveCount / 2));
+  const turnName = players.get(sp.turnPid)?.name || t('队友');
   const special = /_s$/.test(String(sp.family || ''));
   const order = solo ? [] : sp.order;
   const timed = !solo && !sp.untimed;
@@ -188,30 +190,25 @@ export function ChoiceView({ pub, sp, myId, solo, busyIdx = null, total = null, 
     if (t && typeof t.closest === 'function' && t.closest('.spcard, .spov__confirm')) return;
     onDisarm();
   };
-  return html`<div class=${cx('spov', armed != null && 'has-armed')} role="dialog" aria-label="机变阶段" onPointerDown=${onDown}>
+  return html`<div class=${cx('spov', armed != null && 'has-armed')} role="dialog" aria-label=${t('机变阶段')} onPointerDown=${onDown}>
     <div class="spov__veil" aria-hidden="true"></div>
     <div class="spov__inner">
       <header class="spov__head">
         <div class="spov__titles">
-          <${MicroLabel} tone="mint">CONTINGENCY // 机变阶段</${MicroLabel}>
-          <h2 class=${cx('spov__title', special && 'is-special')}>${sp.name || fam?.name || '机变'}<span class="spov__bar">|</span><span class="spov__desc"><${RichText} text=${sp.desc || fam?.desc || '选择一项'} /></span></h2>
-          <p class="spov__sub">${timed ? '倒计时结束后仍未选定将自动分配' : '选择一项（无时间限制）'}${sp.parallel && sp.randomOffer ? ' · 也可投票给「随机分配」：过半即由系统随机发放' : ''}${mine == null && myTurn ? ' · 点击卡牌选中，再次点击确认' : ''}</p>
+          <${MicroLabel} tone="mint">${t('CONTINGENCY // 机变阶段')}</${MicroLabel}>
+          <h2 class=${cx('spov__title', special && 'is-special')}>${sentText(sp.name, rawFam?.name, fam?.name) || fam?.name || t('机变')}<span class="spov__bar">|</span><span class="spov__desc"><${RichText} text=${sentText(sp.desc, rawFam?.desc, fam?.desc) || fam?.desc || t('选择一项')} /></span></h2>
+          <p class="spov__sub">${timed ? t('倒计时结束后仍未选定将自动分配') : t('选择一项（无时间限制）')}${mine == null && myTurn ? t(' · 点击卡牌选中，再次点击确认') : ''}</p>
         </div>
         <div class="spov__turn">
-          ${mine != null ? html`<span class="spov__turntxt is-done"><${Icon} name="check" />已完成选择</span>`
-            : (sp.randomVotes || []).includes(myId) ? html`<span class="spov__turntxt is-done"><${Icon} name="check" />已投票：随机分配</span>`
-            : sp.parallel ? html`<span class="spov__turntxt">等待其他博士决策…<${Icon} name="hourglass" /></span>`
-            : myTurn ? html`<span class="spov__turntxt is-mine">当前轮到你决策</span>`
-            : html`<span class="spov__turntxt">${turnName} 正在决策…<${Icon} name="hourglass" /></span>`}
-          ${sp.parallel && sp.randomOffer ? html`<span class="spov__votes num" title="达到半数票后由系统随机分配（覆盖个人选择）">随机票 <b class="num">${votes}</b>/${votesNeeded}</span>` : null}
-          ${canVote ? html`<${Button} variant="secondary" size="lg" icon="dots" class="spov__random" data-testid="sp-random"
-              title="投票给「随机分配」：达到半数票后由系统把卡牌随机发放给每名博士（覆盖个人选择）" onClick=${onRandom}>随机分配<//>` : null}
+          ${mine != null ? html`<span class="spov__turntxt is-done"><${Icon} name="check" />${t('已完成选择')}</span>`
+            : myTurn ? html`<span class="spov__turntxt is-mine">${t('当前轮到你决策')}</span>`
+            : html`<span class="spov__turntxt">${t('{turnName} 正在决策…', { turnName })}<${Icon} name="hourglass" /></span>`}
           ${armed != null ? html`<${Button} variant="primary" size="lg" icon="check" class="spov__confirm" data-testid="sp-confirm"
-              title=${armedName ? `确认选择「${armedName}」（再次点击卡牌亦可）` : '确认选择'} onClick=${onConfirm}>确认选择<//>` : null}
+              title=${armedName ? t('确认选择「{armedName}」（再次点击卡牌亦可）', { armedName }) : t('确认选择')} onClick=${onConfirm}>${t('确认选择')}<//>` : null}
           ${timed ? html`<${Countdown} deadline=${pub?.deadline} total=${total ?? undefined} size="sm" />` : null}
         </div>
       </header>
-      ${order.length ? html`<div class="spov__order" aria-label="决策顺序">
+      ${order.length ? html`<div class="spov__order" aria-label=${t('决策顺序')}>
         ${order.map((pid, i) => {
           const p = players.get(pid);
           const picked = sp.pickOf.has(pid);
@@ -220,7 +217,7 @@ export function ChoiceView({ pub, sp, myId, solo, busyIdx = null, total = null, 
           return html`<div key=${pid} class=${cx('spov__who', cur && 'is-cur', picked && 'is-done', pid === myId && 'is-self')}>
             <span class="spov__idx num">${i + 1}</span>
             <${PlayerAvatar} player=${p || { name: '?' }} size="sm" self=${pid === myId} />
-            <span class="spov__wname">${p?.name || '博士'}</span>
+            <span class="spov__wname">${p?.name || t('博士')}</span>
             <span class="spov__wstate">${left ? html`<${Icon} name="exit" />` : picked ? html`<${Icon} name="check" />` : cur ? html`<${Icon} name="hourglass" />` : html`<${Icon} name="dots" />`}</span>
           </div>`;
         })}
@@ -232,26 +229,26 @@ export function ChoiceView({ pub, sp, myId, solo, busyIdx = null, total = null, 
           const can = cardPickable(sp, card, { myId, solo, busyIdx });
           const busy = pickBusy(busyIdx, card, mine);
           const isArmed = can && armed === card.idx;
-          const takerName = taker ? (card.takenBy === myId ? '你' : taker.name) : null;
+          const takerName = taker ? (card.takenBy === myId ? t('你') : taker.name) : null;
           return html`<button key=${card.idx} type="button" class=${cx('spcard', `spcard--${r.kind}`, card.takenBy && 'is-taken', card.takenBy === myId && 'is-mine', can && 'is-pickable', isArmed && 'is-armed', busy && 'is-busy')}
               aria-busy=${busy ? 'true' : undefined} aria-pressed=${can ? String(isArmed) : undefined} disabled=${!can} onClick=${() => can && onTap(card.idx)}
-              aria-label=${isArmed ? `${r.name}，已选中，再次点击确认` : takerName ? `${r.name}，${takerName}已选择` : r.name} title=${`${r.name}\n${richTextPlain(r.desc)}`}>
+              aria-label=${isArmed ? t('{name}，已选中，再次点击确认', { name: r.name }) : takerName ? t('{name}，{takerName}已选择', { name: r.name, takerName }) : r.name} title=${`${r.name}\n${richTextPlain(r.desc)}`}>
             <span class="spcard__glow" aria-hidden="true"></span>
             <span class="spcard__head">
               <span class="spcard__icon"><${Img} src=${r.icon} fallback=${html`<${GIcon} name=${r.kind === 'bounty' ? 'target' : 'bolt'} />`} /></span>
               <span class="spcard__title">
                 <b class="spcard__name">${r.name}</b>
                 ${r.team || (r.kind === 'bounty' && r.coin) ? html`<span class="spcard__tags">
-                  ${r.team ? html`<span class="spcard__tag spcard__tag--team">全队获得</span>` : null}
-                  ${r.kind === 'bounty' && r.coin ? html`<span class="spcard__tag spcard__tag--coin">赏金 ${r.coin}</span>` : null}
+                  ${r.team ? html`<span class="spcard__tag spcard__tag--team">${t('全队获得')}</span>` : null}
+                  ${r.kind === 'bounty' && r.coin ? html`<span class="spcard__tag spcard__tag--coin">${t('赏金 {coin}', { coin: r.coin })}</span>` : null}
                 </span>` : null}
               </span>
             </span>
             <${RichText} text=${r.desc} class="spcard__desc" />
             ${r.tier ? html`<${TierChip} tier=${r.tier} size="md" class="spcard__tier" />` : null}
-            ${taker ? html`<span class="spcard__taker" title=${`${taker.name} 已选择`}><${PlayerAvatar} player=${taker} size="sm" /></span>` : null}
-            ${isArmed ? html`<span class="spcard__confirm" role="status"><b>确认选择</b><small>再次点击</small></span>` : null}
-            ${busy ? html`<span class="spcard__busy" role="status">选择中</span>` : null}
+            ${taker ? html`<span class="spcard__taker" title=${t('{name} 已选择', { name: taker.name })}><${PlayerAvatar} player=${taker} size="sm" /></span>` : null}
+            ${isArmed ? html`<span class="spcard__confirm" role="status"><b>${t('确认选择')}</b><small>${t('再次点击')}</small></span>` : null}
+            ${busy ? html`<span class="spcard__busy" role="status">${t('选择中')}</span>` : null}
           </button>`;
         })}
       </div>
