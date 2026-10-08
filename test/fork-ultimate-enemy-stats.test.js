@@ -88,24 +88,29 @@ describe('二.3 — 终极模拟 敌人属性调整（R4 起）', () => {
   test('the shared pool takes the factor PER BOSS — boss_1 4 320 000 vs boss_8 9 720 000 at ×1.2 / ×1.35', () => {
     const g = gd(FORK);
     const o = gd(COOP);
+    // The pool rule is UPSTREAM's (0.2.x, PR #209): config bossHpScale perPlayer true, so co-op share = coop × the
+    // players alive (4 here) — the fork's ×1.2 / ×1.35 land ON TOP of it. The numbers in this test's title are the
+    // fixed-pool ones of 0.1.x (share 1), kept for the ids; the SHARE is read from the mode so the test still proves
+    // what it is about: the two factors are independent and per boss id.
+    const share = g.bossPoolShare(4);
     for (const id of LEADER_IDS) {
       const base = DATA.bosses[id].bloodPoint.ABYSS;
-      assert.equal(g.bossPoolHp(id, 4), Math.round(base * 1.2), `${id} ×1.2`);
-      assert.equal(o.bossPoolHp(id, 4), base, `${id} official unchanged`);
+      assert.equal(g.bossPoolHp(id, 4), Math.round(base * share * 1.2), `${id} ×1.2`);
+      assert.equal(o.bossPoolHp(id, 4), Math.round(base * o.bossPoolShare(4)), `${id} official unchanged`);
       assert.equal(bossPoolHp(g, id, 4), g.bossPoolHp(id, 4), `${id}: finalAssault agrees`);
     }
     for (const id of HIDDEN_IDS) {
       const base = DATA.bosses[id].bloodPoint.ABYSS;
-      assert.equal(g.bossPoolHp(id, 4), Math.round(base * 1.35), `${id} ×1.35`);
-      assert.equal(o.bossPoolHp(id, 4), base, `${id} official unchanged`);
+      assert.equal(g.bossPoolHp(id, 4), Math.round(base * share * 1.35), `${id} ×1.35`);
+      assert.equal(o.bossPoolHp(id, 4), Math.round(base * o.bossPoolShare(4)), `${id} official unchanged`);
       assert.equal(bossPoolHp(g, id, 4), g.bossPoolHp(id, 4), `${id}: finalAssault agrees`);
     }
     // the two factors are genuinely independent: neither can move the other's pool
-    assert.equal(g.bossPoolHp('boss_1', 4), Math.round(DATA.bosses.boss_1.bloodPoint.ABYSS * 1.2));
-    assert.notEqual(Math.round(DATA.bosses.boss_1.bloodPoint.ABYSS * 1.35), g.bossPoolHp('boss_1', 4));
-    // solo keeps its 0.25 share, on top of the extra
+    assert.equal(g.bossPoolHp('boss_1', 4), Math.round(DATA.bosses.boss_1.bloodPoint.ABYSS * share * 1.2));
+    assert.notEqual(Math.round(DATA.bosses.boss_1.bloodPoint.ABYSS * share * 1.35), g.bossPoolHp('boss_1', 4));
+    // solo keeps its own share, on top of the extra (UPSTREAM's rule: config bossHpScale solo, 1 since 0.2.x)
     const solo = new GameData(DATA, 'mode_single_abyss'); // official: no extra
-    assert.equal(solo.bossPoolHp('boss_2'), Math.round(DATA.bosses.boss_2.bloodPoint.ABYSS * 0.25));
+    assert.equal(solo.bossPoolHp('boss_2'), Math.round(DATA.bosses.boss_2.bloodPoint.ABYSS * solo.bossPoolShare()));
   });
 
   test('real R4 normal spawns: ordinary +10 % HP and nothing else (R4 is not a boss round)', () => {

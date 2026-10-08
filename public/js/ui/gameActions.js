@@ -74,7 +74,8 @@ export const actions = {
   emoteBurst: (id) => act('g.emoteBurst', { id }, { quiet: true }),
   // 作弊菜单 (fork 三, every mode): one CHEAT_ACTIONS entry; `on` only means something for 无限资金
   cheat: (action, on = null) => act('g.cheat', on == null ? { action } : { action, on }, { quiet: true }),
-  watch: (fieldId) => act('g.watch', { fieldId }, { sfx: 'tab' }),
+  // `playerId`: the player tapped in the team panel (a shared field shows two) — what an eliminated viewer follows
+  watch: (fieldId, playerId = null) => act('g.watch', typeof playerId === 'string' && playerId ? { fieldId, playerId } : { fieldId }, { sfx: 'tab' }),
   autoplay: (on) => act('g.autoplay', { on }),
   // solo battles only (ui/matchStatus.js pauseAvailable): m.public.paused follows
   pause: (on) => act('g.pause', { on: !!on }, { sfx: on ? 'click' : 'confirm' }),

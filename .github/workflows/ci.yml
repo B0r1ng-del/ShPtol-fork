@@ -67,3 +67,29 @@ jobs:
           node tools/doctor.mjs
           node tools/fork-data.mjs --check
           kill $pid || true
+
+  # Separate from the test matrix so lint / types / import boundaries run once, not four times.
+  # Lint warnings do not fail the job (npm run lint does not pass --max-warnings=0).
+  tooling:
+    name: tooling (lint, imports, typecheck)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install (npm ci → postinstall copies public/vendor)
+        run: npm ci --no-audit --no-fund
+
+      - name: Lint (warnings allowed)
+        run: npm run lint
+
+      - name: Import boundaries
+        run: npm run check:imports
+
+      - name: Typecheck
+        run: npm run typecheck
